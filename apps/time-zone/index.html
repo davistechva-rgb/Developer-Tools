@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Time Zone Converter | Developer Tools</title>
+<meta name="description" content="One moment shown across several time zones">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.tzr{display:grid;grid-template-columns:1.3fr 1.3fr .9fr 1.4fr auto;gap:8px 18px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.tzr:first-child{border-top:0}.tzr.src{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 10%,transparent),transparent)}
+.tz-n,.tz-when,.tz-o{display:grid}.tt{font:700 1.5rem/1.1 var(--mono);font-stretch:87.5%}.dd{color:var(--accent)}
+.tz-b{position:relative;height:14px;border:1px solid var(--line);border-radius:1px;background:linear-gradient(90deg,transparent 37.5%,color-mix(in srgb,var(--good) 30%,transparent) 37.5% 70.83%,transparent 70.83%)}
+.tz-b i{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1px;background:var(--muted)}.tz-b i.w{background:var(--good)}
+.tz-x{min-width:80px;text-align:right}
+@media (max-width:860px){.tzr{grid-template-columns:1fr 1fr}.tz-b{grid-column:1/-1}.tz-x{text-align:left}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row">
+  <div><label class="lbl" for="dt">Date and time</label><input type="datetime-local" id="dt" class="field" style="width:auto"></div>
+  <div><label class="lbl" for="src">In time zone</label><input type="text" id="src" list="zl" spellcheck="false" style="width:260px;font-family:var(--ui)"></div>
+  <div style="align-self:flex-end" class="row"><button class="btn" type="button" id="now">Now</button><label class="chk"><input type="checkbox" id="live"> Keep updating</label></div>
+ </div>
+ <datalist id="zl"></datalist>
+</section>
+<section class="panel" style="margin-top:28px">
+ <div class="panel-h"><h2>Around the world</h2><div class="row"><label class="sr" for="add">Add a time zone</label><input type="text" id="add" list="zl" placeholder="Add a city or zone" spellcheck="false" style="width:240px;font-family:var(--ui)"><button class="btn sm" type="button" id="addB">Add</button></div></div>
+ <div id="rows"></div>
+ <p class="hint mt">The shaded part of each bar is 9 AM to 5 PM there. The marker shows the chosen time.</p>
+</section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("time-zone");
+
+const $=DT.$;const here=Intl.DateTimeFormat().resolvedOptions().timeZone;
+const ZONES=(Intl.supportedValuesOf?Intl.supportedValuesOf("timeZone"):["UTC","America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Europe/London","Europe/Paris","Asia/Kolkata","Asia/Tokyo","Australia/Sydney"]);
+if(!ZONES.includes("UTC"))ZONES.unshift("UTC");
+$("#zl").innerHTML=ZONES.map(z=>`<option value="${z}">${z.replace(/_/g," ")}</option>`).join("");
+const s=Object.assign({src:here,zones:[here,"UTC","America/Chicago","America/Denver","America/Los_Angeles","Europe/London","Asia/Kolkata","Asia/Tokyo"].filter((v,i,a)=>a.indexOf(v)===i),live:true},DT.get("tz",{}));
+function parts(ms,tz){const p={};new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}).formatToParts(ms).forEach(x=>p[x.type]=x.value);return p}
+function offset(ms,tz){const p=parts(ms,tz);return(Date.UTC(+p.year,p.month-1,+p.day,+p.hour%24,+p.minute,+p.second)-Math.floor(ms/1000)*1000)/60000}
+function zonedToUtc(str,tz){const [d,tm]=str.split("T");const [Y,M,D]=d.split("-").map(Number);const [h,m]=(tm||"00:00").split(":").map(Number);
+ let guess=Date.UTC(Y,M-1,D,h,m);for(let i=0;i<3;i++)guess=Date.UTC(Y,M-1,D,h,m)-offset(guess,tz)*60000;return guess}
+const offStr=o=>`UTC${o<0?"−":"+"}${String(Math.floor(Math.abs(o)/60)).padStart(2,"0")}:${String(Math.abs(o)%60).padStart(2,"0")}`;
+function localInput(ms,tz){const p=parts(ms,tz);return`${p.year}-${p.month}-${p.day}T${p.hour%24===24?"00":p.hour}:${p.minute}`}
+let when=Date.now();
+function valid(z){return ZONES.includes(z)||(()=>{try{new Intl.DateTimeFormat("en",{timeZone:z});return true}catch(e){return false}})()}
+function render(){DT.set("tz",s);const srcP=parts(when,s.src);const srcDay=Date.UTC(+srcP.year,srcP.month-1,+srcP.day);
+ $("#rows").innerHTML=s.zones.map((z,i)=>{const p=parts(when,z),o=offset(when,z),day=Date.UTC(+p.year,p.month-1,+p.day),dd=Math.round((day-srcDay)/864e5);
+  const time=new Intl.DateTimeFormat(undefined,{timeZone:z,hour:"numeric",minute:"2-digit"}).format(when),date=new Intl.DateTimeFormat(undefined,{timeZone:z,weekday:"short",month:"short",day:"numeric"}).format(when);
+  const abbr=(new Intl.DateTimeFormat("en-US",{timeZone:z,timeZoneName:"short"}).formatToParts(when).find(x=>x.type==="timeZoneName")||{}).value||"";
+  const hr=(+p.hour%24)+ +p.minute/60,work=hr>=9&&hr<17;const city=z.split("/").pop().replace(/_/g," ");
+  return`<div class="tzr${z===s.src?" src":""}"><div class="tz-n"><b>${DT.esc(city)}</b><span class="hint">${DT.esc(z)}${z===here?" (you)":""}</span></div>
+   <div class="tz-t"><span class="tt">${time}</span><span class="hint">${date}${dd?` <strong class="dd">${dd>0?"+":""}${dd} day</strong>`:""}</span></div>
+   <div class="tz-o"><span class="code">${offStr(o)}</span><span class="hint">${DT.esc(abbr)}</span></div>
+   <div class="tz-b" aria-hidden="true"><i style="left:${hr/24*100}%" class="${work?"w":""}"></i></div>
+   <div class="tz-x">${z===s.src?"":`<button class="btn sm ghost" type="button" data-rm="${i}" aria-label="Remove ${DT.attr(city)}">Remove</button>`}</div></div>`}).join("");
+ DT.$$("[data-rm]").forEach(b=>b.onclick=()=>{s.zones.splice(+b.dataset.rm,1);render()})}
+function fromInputs(){const z=$("#src").value.trim();if(!valid(z))return;s.src=z;if(!s.zones.includes(z))s.zones.unshift(z);if($("#dt").value)when=zonedToUtc($("#dt").value,z);render()}
+$("#src").value=s.src;$("#src").onchange=()=>{const z=$("#src").value.trim();if(valid(z)){s.src=z;$("#dt").value=localInput(when,z);if(!s.zones.includes(z))s.zones.unshift(z);render()}};
+$("#dt").oninput=()=>{s.live=false;$("#live").checked=false;fromInputs()};
+$("#now").onclick=()=>{when=Date.now();$("#dt").value=localInput(when,s.src);render()};
+$("#live").checked=s.live;$("#live").onchange=e=>{s.live=e.target.checked;if(s.live)$("#now").click();DT.set("tz",s)};
+function add(){const z=$("#add").value.trim();const m=valid(z)?z:ZONES.find(x=>x.toLowerCase().replace(/_/g," ").endsWith("/"+z.toLowerCase()));if(!m){DT.toast("Pick a zone from the list");return}if(!s.zones.includes(m))s.zones.push(m);$("#add").value="";render()}
+$("#addB").onclick=add;$("#add").onkeydown=e=>{if(e.key==="Enter")add()};
+setInterval(()=>{if(s.live){when=Date.now();$("#dt").value=localInput(when,s.src);render()}},15000);
+$("#dt").value=localInput(when,s.src);render();
+
+</script>
+</body>
+</html>

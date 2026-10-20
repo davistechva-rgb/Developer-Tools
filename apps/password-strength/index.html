@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Password Strength Checker | Developer Tools</title>
+<meta name="description" content="See how long a password would hold up, and what weakens it">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.sec{font:700 1rem/1.3 var(--ui);margin:24px 0 6px}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.checks li{display:flex;gap:10px;align-items:flex-start}
+.checks li::before{content:"";flex:none;width:14px;height:14px;margin-top:.3em;border:2px solid var(--good);border-radius:50%}
+.checks li.no::before{border-color:var(--bad);border-radius:1px;transform:rotate(45deg) scale(.85);background:var(--bad)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel" aria-labelledby="in-h">
+  <div class="panel-h"><label class="h" id="in-h" for="pw">Password to check</label>
+   <label class="chk"><input type="checkbox" id="show"> Show</label></div>
+  <input type="password" id="pw" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Type or paste a password" style="font-size:1.15rem;padding:14px">
+  <div class="mt"><div class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></div>
+  <p class="status mt" id="verdict" aria-live="polite">Start typing to see a rating.</p>
+  <h2 class="sec">Time to crack</h2>
+  <table class="t" id="times"><thead><tr><th scope="col">Attack</th><th scope="col">Estimated time</th></tr></thead><tbody></tbody></table>
+  <p class="hint mt">These are rough estimates for a guess-everything attacker. Real attackers try common passwords and patterns first, which this checker accounts for.</p>
+ </section>
+ <div class="stack">
+ <section class="panel" aria-labelledby="chk-h">
+  <div class="panel-h"><h2 id="chk-h">What we found</h2></div>
+  <ul class="checks" id="checks"></ul>
+ </section>
+ <section class="panel" aria-labelledby="br-h">
+  <div class="panel-h"><h2 id="br-h">Known breaches</h2></div>
+  <p class="hint">Checks the Have I Been Pwned list of leaked passwords. Only the first 5 characters of the password's SHA-1 hash leave this device, never the password itself.</p>
+  <button class="btn mt" id="breach" type="button">Check known breaches</button>
+  <p class="status mt" id="brRes" hidden aria-live="polite"></p>
+ </section>
+ </div>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("password-strength");
+
+const COMMON=new Set(["000000", "1111", "111111", "11111111", "112233", "121212", "123123", "123321", "1234", "12345", "123456", "1234567", "12345678", "123456789", "1234567890", "123qwe", "131313", "159753", "1q2w3e4r", "1q2w3e4r5t", "1qaz2wsx", "2000", "555555", "654321", "666666", "696969", "777777", "7777777", "888888", "987654321", "999999", "aaaaaa", "abc123", "abcd1234", "abcdef", "access", "admin", "admin123", "amanda", "andrew", "apple", "asdf", "asdfgh", "asdfghjkl", "ashley", "austin", "autumn", "baseball", "baseball1", "batman", "biteme", "blink182", "buster", "changeme", "charlie", "charlie1", "cheese", "chelsea", "computer", "dallas", "daniel", "default", "dragon", "facebook", "fall", "flower", "football", "football1", "freedom", "george", "ginger", "google", "guest", "harley", "hello", "hockey", "hottie", "hunter", "iloveyou", "iloveyou1", "jennifer", "jessica", "jordan", "joshua", "killer", "klaster", "letmein", "letmein1", "linkedin", "login", "love", "lovely", "maggie", "master", "matrix", "matthew", "michael", "michelle", "monday", "monkey", "mustang", "nicole", "pass", "passw0rd", "password", "password1", "password123", "pepper", "princess", "princess1", "q1w2e3r4", "qazwsx", "qwerty", "qwerty123", "qwertyuiop", "ranger", "robert", "root", "samsung", "secret", "shadow", "soccer", "spring", "starwars", "summer", "sunshine", "sunshine1", "superman", "superman1", "taylor", "temp", "temp123", "test", "test123", "thomas", "thunder", "tigger", "toor", "trustno1", "welcome", "welcome1", "whatever", "winter", "yankees", "zaq12wsx", "zxcvbn", "zxcvbnm"]);
+const $=DT.$;
+const ROWS=["qwertyuiop","asdfghjkl","zxcvbnm","1234567890","qazwsx","!@#$%^&*()"];
+const LEET={"4":"a","@":"a","3":"e","1":"i","!":"i","0":"o","$":"s","5":"s","7":"t","+":"t"};
+const WORDS=["password","admin","welcome","login","letmein","qwerty","dragon","monkey","master","shadow","sunshine","princess","football","baseball","soccer","hockey","summer","winter","spring","autumn","iloveyou","love","secret","hello","freedom","computer","company","office","school","family","jesus","god","money","test","user","guest","root","changeme","default","pass"];
+function unleet(s){return s.toLowerCase().replace(/[4@3!10$57+]/g,c=>LEET[c])}
+function analyze(p){
+ const f=[];const len=[...p].length;
+ let pool=0;const has={lo:/[a-z]/.test(p),up:/[A-Z]/.test(p),di:/\d/.test(p),sy:/[^A-Za-z0-9\s]/.test(p)&&/[\x21-\x7e]/.test(p),sp:/\s/.test(p),uni:/[^\x00-\x7f]/.test(p)};
+ if(has.lo)pool+=26;if(has.up)pool+=26;if(has.di)pool+=10;if(has.sy)pool+=33;if(has.sp)pool+=1;if(has.uni)pool+=100;
+ let cut=0;const low=p.toLowerCase(),ul=unleet(p);
+ const core=ul.replace(/^[^a-z]+|[^a-z]+$/g,"");
+ const isCommon=COMMON.has(low)||COMMON.has(ul)||COMMON.has(core)||COMMON.has(low.replace(/[\d\W_]+$/,""));
+ // repeats
+ const rep=p.match(/(.)\1{2,}/g)||[];rep.forEach(r=>cut+=r.length-1);
+ const reps2=p.match(/(.{2,4})\1+/g)||[];reps2.forEach(r=>cut+=Math.floor(r.length/2));
+ // sequences
+ let seqs=[];let run=1;
+ for(let i=1;i<=low.length;i++){const d=i<low.length?low.charCodeAt(i)-low.charCodeAt(i-1):99;const prev=i>1?low.charCodeAt(i-1)-low.charCodeAt(i-2):98;
+  if(i<low.length&&(d===1||d===-1)&&(run===1||d===prev))run++;else{if(run>=3){seqs.push(low.slice(i-run,i));cut+=run-1}run=(i<low.length&&(d===1||d===-1))?2:1}}
+ // keyboard rows
+ const kb=[];ROWS.forEach(r=>{for(let n=r.length;n>=4;n--)for(let i=0;i+n<=r.length;i++){const s=r.slice(i,i+n);if(low.includes(s)&&!kb.some(k=>k.includes(s))){kb.push(s);cut+=n-1}}});
+ // words
+ const words=WORDS.filter(w=>ul.includes(w)&&w.length>=4);words.forEach(w=>cut+=w.length-1);
+ // years and dates
+ const years=p.match(/(19|20)\d\d/g)||[];years.forEach(()=>cut+=3);
+ const eff=Math.max(len>0?1:0,len-cut);
+ let bits=pool?eff*Math.log2(pool):0;
+ if(isCommon)bits=Math.min(bits,8);
+ f.push([len>=12,len>=16?`Length is ${len} characters. Great.`:len>=12?`Length is ${len} characters. Good; 16 or more is better.`:`Only ${len} character${len===1?"":"s"}. Aim for at least 12, ideally 16 or more.`]);
+ const kinds=[has.lo,has.up,has.di,has.sy||has.sp||has.uni].filter(Boolean).length;
+ f.push([kinds>=3||len>=20,`Uses ${kinds} of 4 character types (lowercase, uppercase, numbers, symbols).`+(kinds<3&&len<20?" Mixing types helps if the password is short.":"")]);
+ f.push([!isCommon,isCommon?"This is one of the most common passwords. It would be guessed almost instantly.":"Not on the common-password list."]);
+ if(words.length)f.push([false,`Contains a common word: ${words.join(", ")}. Swapping letters for symbols (like @ for a) doesn't fool attackers.`]);
+ if(seqs.length)f.push([false,`Contains a sequence: ${seqs.join(", ")}.`]);
+ if(kb.length)f.push([false,`Contains a keyboard pattern: ${kb.join(", ")}.`]);
+ if(rep.length||reps2.length)f.push([false,`Contains repeated characters: ${[...rep,...reps2].join(", ")}.`]);
+ if(years.length)f.push([false,`Contains what looks like a year: ${years.join(", ")}. Birth years and dates are easy to guess.`]);
+ if(!words.length&&!seqs.length&&!kb.length&&!rep.length&&!reps2.length&&!years.length&&!isCommon&&len)f.push([true,"No common patterns found."]);
+ return {bits,f,len}}
+const ATT=[["Online, rate-limited (100 guesses an hour)",100/3600],["Online, no limit (10 guesses a second)",10],["Offline, slow hash like bcrypt (10,000 a second)",1e4],["Offline, fast hash on a GPU rig (100 billion a second)",1e11]];
+function dur(sec){if(sec<1)return"Instantly";const u=[["second",60],["minute",60],["hour",24],["day",30.44],["month",12],["year",100],["century",1e9]];
+ let v=sec;for(const [n,m] of u){if(v<m||n==="century"){const r=Math.round(v);if(n==="century"&&v>=1e6)return"Longer than the age of the universe";return`${r.toLocaleString()} ${n==="century"?(r===1?"century":"centuries"):n+(r===1?"":"s")}`}v/=m}}
+function render(){const p=$("#pw").value;$("#brRes").hidden=true;
+ const tb=$("#times tbody");
+ if(!p){$("#meter").dataset.s=0;$("#verdict").className="status mt";$("#verdict").textContent="Start typing to see a rating.";$("#checks").innerHTML="";tb.innerHTML=ATT.map(a=>`<tr><td>${a[0]}</td><td>–</td></tr>`).join("");return}
+ const r=analyze(p);const lv=r.bits<28?1:r.bits<36?2:r.bits<60?3:r.bits<80?4:5;
+ $("#meter").dataset.s=lv;const v=$("#verdict");v.className="status mt "+(lv<=2?"bad":lv===3?"warn":"good");
+ v.innerHTML=`${["","Very weak","Weak","Fair","Strong","Very strong"][lv]}<span class="sub">About ${Math.round(r.bits)} bits of effective entropy.</span>`;
+ const guesses=Math.pow(2,r.bits)/2;
+ tb.innerHTML=ATT.map(a=>`<tr><td>${a[0]}</td><td class="code">${dur(guesses/a[1])}</td></tr>`).join("");
+ $("#checks").innerHTML=r.f.map(([ok,t])=>`<li class="${ok?"ok":"no"}"><span class="sr">${ok?"Good: ":"Problem: "}</span>${DT.esc(t)}</li>`).join("");
+}
+$("#pw").addEventListener("input",render);
+$("#show").onchange=e=>$("#pw").type=e.target.checked?"text":"password";
+$("#breach").onclick=async()=>{const p=$("#pw").value,o=$("#brRes");o.hidden=false;
+ if(!p){o.className="status warn mt";o.textContent="Type a password first.";return}
+ o.className="status mt";o.textContent="Checking…";
+ try{const h=DT.hex(await DT.digest("SHA-1",DT.utf8(p))).toUpperCase();
+  const res=await fetch("https://api.pwnedpasswords.com/range/"+h.slice(0,5),{headers:{"Add-Padding":"true"}});
+  if(!res.ok)throw new Error(res.status);
+  const line=(await res.text()).split("\n").find(l=>l.startsWith(h.slice(5)));const n=line?parseInt(line.split(":")[1]):0;
+  if(n>0){o.className="status bad mt";o.innerHTML=`Found in known breaches<span class="sub">This password appears ${n.toLocaleString()} times in leaked password lists. Don't use it anywhere.</span>`}
+  else{o.className="status good mt";o.innerHTML=`Not found in known breaches<span class="sub">That's good, but it doesn't make a weak password strong.</span>`}
+ }catch(e){o.className="status warn mt";o.innerHTML=`Couldn't reach the breach database<span class="sub">Check your internet connection and try again.</span>`}};
+render();
+
+</script>
+</body>
+</html>

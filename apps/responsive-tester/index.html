@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Responsive Design Tester | Developer Tools</title>
+<meta name="description" content="Preview a page at common device sizes">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.stage{display:flex;gap:24px;justify-content:center;align-items:flex-start;margin-top:28px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px}
+.dev{margin:0;flex:none}.dev figcaption{font-weight:700;margin-bottom:8px;font-size:.92rem}
+.scr{overflow:hidden;border:1px solid var(--line-strong);border-radius:6px;background:#fff;box-shadow:0 0 0 6px var(--inset)}
+.scr iframe{border:0;transform-origin:0 0;display:block;background:#fff}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row"><label class="sr" for="url">Page address</label><input type="text" id="url" spellcheck="false" autocomplete="off" placeholder="https://your-site.com" style="flex:1;min-width:240px;font-family:var(--ui)"><button class="btn primary" type="button" id="go">Load</button></div>
+ <div class="row mt">
+  <div class="seg" role="group" aria-label="View"><button type="button" data-v="one">One device</button><button type="button" data-v="all">Side by side</button></div>
+  <select id="dev" aria-label="Device"></select>
+  <label class="row" style="gap:6px"><span class="sr">Custom width</span><input type="number" id="cw" style="width:90px" aria-label="Width"><span>×</span><input type="number" id="ch" style="width:90px" aria-label="Height"></label>
+  <button class="btn sm" type="button" id="rot">Rotate</button><button class="btn sm ghost" type="button" id="rel">Reload</button>
+ </div>
+ <p class="hint mt">Many sites (Google, banks, most big platforms) block being shown inside another page. If a frame stays blank, that's the site's security setting. Your own sites usually work, and you can also test pages on this same Netlify site.</p>
+</section>
+<div id="stage" class="stage"></div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("responsive-tester");
+
+const $=DT.$;const D=[["iPhone SE",375,667],["iPhone 15",393,852],["iPhone 15 Pro Max",430,932],["Pixel 8",412,915],["Galaxy S24",360,780],["iPad mini",744,1133],["iPad Air",820,1180],["iPad Pro 12.9″",1024,1366],["Chromebook",1366,768],["Laptop",1440,900],["Desktop HD",1920,1080]];
+const s=Object.assign({url:"",v:"one",dev:1,rot:false,cw:393,ch:852},DT.get("resp",{}));
+$("#dev").innerHTML=D.map(([n,w,h],i)=>`<option value="${i}">${n} (${w} × ${h})</option>`).join("")+`<option value="-1">Custom size</option>`;
+function norm(u){u=u.trim();if(!u)return new URL("../../index.html",location.href).href;if(!/^[a-z]+:/i.test(u)&&!u.startsWith("/")&&!u.startsWith("."))u="https://"+u;return u}
+function frame(n,w,h){if(s.rot)[w,h]=[h,w];return{n,w,h}}
+function render(){DT.set("resp",s);DT.$$("[data-v]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===s.v));
+ $("#dev").value=s.dev;$("#cw").value=s.cw;$("#ch").value=s.ch;$("#dev").hidden=s.v!=="one";$("#cw").parentElement.hidden=s.v!=="one"||+s.dev!==-1;
+ const url=norm(s.url);const list=s.v==="all"?[D[0],D[1],D[6],D[9]].map(d=>frame(...d)):[+s.dev===-1?frame("Custom",+s.cw||375,+s.ch||667):frame(...D[s.dev])];
+ const avail=$("#stage").clientWidth||1100;const gap=24,per=s.v==="all"?(avail-gap*(list.length-1))/list.length:avail;
+ $("#stage").innerHTML=list.map(f=>{const sc=Math.min(1,per/f.w,(s.v==="all"?640:760)/f.h);return`<figure class="dev" style="width:${f.w*sc}px"><figcaption>${DT.esc(f.n)} <span class="hint">${f.w} × ${f.h}${sc<1?`, shown at ${Math.round(sc*100)}%`:""}</span></figcaption>
+  <div class="scr" style="width:${f.w*sc}px;height:${f.h*sc}px"><iframe src="${DT.attr(url)}" title="${DT.attr(f.n)} preview" style="width:${f.w}px;height:${f.h}px;transform:scale(${sc})" loading="lazy" referrerpolicy="no-referrer"></iframe></div></figure>`}).join("")}
+$("#url").value=s.url;$("#go").onclick=()=>{s.url=$("#url").value;render()};$("#url").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
+DT.$$("[data-v]").forEach(b=>b.onclick=()=>{s.v=b.dataset.v;render()});
+$("#dev").onchange=e=>{s.dev=+e.target.value;render()};$("#cw").onchange=e=>{s.cw=+e.target.value;render()};$("#ch").onchange=e=>{s.ch=+e.target.value;render()};
+$("#rot").onclick=()=>{s.rot=!s.rot;render()};$("#rel").onclick=render;addEventListener("resize",DT.debounce(render,200));
+render();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Text Case Converter | Developer Tools</title>
+<meta name="description" content="camelCase, snake_case, Title Case, and more">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.cases th{white-space:nowrap;color:var(--ink);width:210px}
+.cases td.o{white-space:pre-wrap;word-break:break-word;font-size:.88rem}
+.cases tr:last-child>*{border-bottom:0}
+@media (max-width:640px){.cases th{width:auto;white-space:normal}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel"><div class="panel-h"><label class="h" for="in">Your text</label><div class="row"><label class="chk"><input type="checkbox" id="perLine"> Convert each line separately</label><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+ <textarea id="in" spellcheck="false" placeholder="Paste text, a variable name, or a list of names (one per line)" style="min-height:130px"></textarea></section>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2>Conversions</h2><span class="hint">Click Copy on the one you need</span></div>
+ <table class="t cases"><tbody id="rows"></tbody></table></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("text-case");
+
+const $=DT.$,s=Object.assign({perLine:true},DT.get("case",{}));
+const SMALL=new Set("a an and as at but by en for if in nor of on or per the to via vs".split(" "));
+function words(t){return t.replace(/([a-z\d])([A-Z])/g,"$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g,"$1 $2").replace(/([a-zA-Z])(\d)/g,"$1 $2").split(/[^A-Za-z\d\u00C0-\u024F]+/).filter(Boolean)}
+const lc=w=>w.toLowerCase(),uc=w=>w.toUpperCase(),tc=w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
+const C=[
+ ["UPPERCASE",t=>t.toUpperCase(),0],["lowercase",t=>t.toLowerCase(),0],
+ ["Title Case",t=>t.toLowerCase().replace(/[^\s-]+/g,(w,i)=>{const core=w.replace(/^[^\w]+/,"");return i>0&&SMALL.has(core.replace(/\W+$/,""))&&!/[:.!?]\s*$/.test(t.slice(0,i).trimEnd().slice(-1))?w:w.replace(/[a-z\u00E0-\u024F]/,c=>c.toUpperCase())}),0],
+ ["Sentence case",t=>t.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)([a-z\u00E0-\u024F])/g,(m,a,b)=>a+b.toUpperCase()).replace(/\bi\b/g,"I"),0],
+ ["camelCase",t=>words(t).map((w,i)=>i?tc(w):lc(w)).join(""),1],["PascalCase",t=>words(t).map(tc).join(""),1],
+ ["snake_case",t=>words(t).map(lc).join("_"),1],["SCREAMING_SNAKE_CASE",t=>words(t).map(uc).join("_"),1],
+ ["kebab-case",t=>words(t).map(lc).join("-"),1],["Train-Case",t=>words(t).map(tc).join("-"),1],
+ ["dot.case",t=>words(t).map(lc).join("."),1],["path/case",t=>words(t).map(lc).join("/"),1],
+ ["aLtErNaTiNg cAsE",t=>{let i=0;return t.replace(/[a-z]/gi,c=>i++%2?c.toUpperCase():c.toLowerCase())},0],
+ ["InVERSE cASE",t=>t.replace(/[a-z]/gi,c=>c===c.toUpperCase()?c.toLowerCase():c.toUpperCase()),0]];
+$("#rows").innerHTML=C.map(([n],i)=>`<tr><th scope="row">${n}</th><td class="code o" id="o${i}"></td><td style="width:1%"><button class="btn sm" type="button" data-i="${i}">Copy</button></td></tr>`).join("");
+let res=[];
+function run(){DT.set("case",s);const t=$("#in").value;
+ res=C.map(([,f,id])=>id||s.perLine?t.split("\n").map(f).join("\n"):f(t));
+ res.forEach((r,i)=>$("#o"+i).textContent=r||"—")}
+DT.$$("[data-i]").forEach(b=>b.onclick=()=>DT.copy(res[b.dataset.i],b));
+$("#perLine").checked=s.perLine;$("#perLine").onchange=e=>{s.perLine=e.target.checked;run()};
+$("#in").addEventListener("input",run);$("#clear").onclick=()=>{$("#in").value="";run();$("#in").focus()};
+$("#in").value="davis tech support: remote backup job for the main office";run();
+
+</script>
+</body>
+</html>

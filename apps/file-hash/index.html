@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>File Hash Calculator | Developer Tools</title>
+<meta name="description" content="Checksums for files of any type, calculated on your device">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.fh{border-top:1px solid var(--line);padding:14px 0 6px}
+.fh-h{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.fh-h b{word-break:break-all}.fh-h button{margin-left:auto}
+.fh th{width:90px;white-space:nowrap;color:var(--ink)}.fh td.h{word-break:break-all;font-size:.86rem}
+.fh tr:last-child>*{border-bottom:0}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="panel-h"><h2>Files</h2>
+  <div class="row">
+   <label class="chk"><input type="checkbox" data-al="MD5"> MD5</label>
+   <label class="chk"><input type="checkbox" data-al="SHA-1"> SHA-1</label>
+   <label class="chk"><input type="checkbox" data-al="SHA-256"> SHA-256</label>
+   <label class="chk"><input type="checkbox" data-al="SHA-384"> SHA-384</label>
+   <label class="chk"><input type="checkbox" data-al="SHA-512"> SHA-512</label>
+  </div></div>
+ <div class="drop" id="drop"><strong>Drop files here</strong><span class="hint">or click to choose. Add as many as you like. Files are read on this device and never uploaded.</span></div>
+ <div class="row mt spread" id="bar" hidden>
+  <span class="hint" id="sum"></span>
+  <div class="row"><label class="row" style="gap:8px"><span class="lbl" style="margin:0">Save as</span><select id="fmtSel"></select></label>
+   <button class="btn sm" type="button" id="copyList">Copy</button><button class="btn sm" type="button" id="save">Download</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div>
+ </div>
+ <div id="list" class="mt"></div>
+</section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("file-hash");
+
+const $=DT.$;let algos=DT.get("filehash.algos",["MD5","SHA-1","SHA-256"]);const files=[];
+DT.$$("[data-al]").forEach(c=>{c.checked=algos.includes(c.dataset.al);c.onchange=()=>{algos=DT.ALGOS.filter(a=>$(`[data-al="${a}"]`).checked);DT.set("filehash.algos",algos);rehash()}});
+function opts(){$("#fmtSel").innerHTML=algos.map(a=>`<option value="${a}">${a} checksum file</option>`).join("")+`<option value="csv">CSV (all columns)</option>`}
+function render(){$("#bar").hidden=!files.length;opts();
+ $("#sum").textContent=`${files.length} file${files.length===1?"":"s"}, ${DT.bytes(files.reduce((s,f)=>s+f.file.size,0))}`;
+ $("#list").innerHTML=files.map((f,i)=>`<div class="fh"><div class="fh-h"><b>${DT.esc(f.file.name)}</b><span class="hint">${DT.bytes(f.file.size)}</span><button class="btn sm ghost" type="button" data-rm="${i}" aria-label="Remove ${DT.attr(f.file.name)}">Remove</button></div>
+  ${f.err?`<p class="status bad">${DT.esc(f.err)}</p>`:`<table class="t"><tbody>${algos.map(a=>`<tr><th scope="row">${a}</th><td class="code h">${f.h[a]||'<span class="hint">Calculating…</span>'}</td><td style="width:1%">${f.h[a]?`<button class="btn sm" type="button" data-c="${i}|${a}">Copy</button>`:""}</td></tr>`).join("")}</tbody></table>`}</div>`).join("");
+ DT.$$("[data-c]").forEach(b=>b.onclick=()=>{const [i,a]=b.dataset.c.split("|");DT.copy(files[i].h[a],b)});
+ DT.$$("[data-rm]").forEach(b=>b.onclick=()=>{files.splice(+b.dataset.rm,1);render()})}
+let queue=Promise.resolve();
+function hashFile(f){queue=queue.then(async()=>{
+ if(!DT.canHash()){f.err="This browser can't hash files here.";render();return}
+ if(f.file.size>1.5e9){f.err="Over 1.5 GB. Browsers can run out of memory on files this large; use certutil -hashfile (Windows) or shasum -a 256 (Mac) instead.";render();return}
+ if(!f.buf)f.buf=new Uint8Array(await f.file.arrayBuffer());
+ for(const a of algos)if(!f.h[a]){f.h[a]=DT.hex(await DT.digest(a,f.buf));render()}
+ if(files.length>20)f.buf=null})}
+function rehash(){render();files.forEach(hashFile)}
+DT.fileDrop($("#drop"),()=>{});
+const inp=$("#drop").nextElementSibling;inp.multiple=true;
+function add(list){[...list].forEach(file=>{const f={file,h:{}};files.push(f);hashFile(f)});render()}
+inp.addEventListener("change",()=>{add(inp.files);inp.value=""},true);
+$("#drop").addEventListener("drop",e=>{e.preventDefault();add(e.dataTransfer.files)},true);
+function out(){const v=$("#fmtSel").value;
+ if(v==="csv")return["File,Bytes,"+algos.join(","),...files.filter(f=>!f.err).map(f=>`"${f.file.name.replace(/"/g,'""')}",${f.file.size},`+algos.map(a=>f.h[a]||"").join(","))].join("\n")+"\n";
+ return files.filter(f=>f.h[v]).map(f=>`${f.h[v]}  ${f.file.name}`).join("\n")+"\n"}
+$("#copyList").onclick=e=>DT.copy(out(),e.currentTarget);
+$("#save").onclick=()=>{const v=$("#fmtSel").value;DT.download(v==="csv"?"checksums.csv":v.replace("-","").toLowerCase()+"sums.txt",out())};
+$("#clear").onclick=()=>{files.length=0;render()};
+render();
+
+</script>
+</body>
+</html>

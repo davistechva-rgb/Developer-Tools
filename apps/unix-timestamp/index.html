@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Unix Timestamp Converter | Developer Tools</title>
+<meta name="description" content="Epoch seconds and milliseconds to readable dates and back">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.nowrow{display:grid;grid-template-columns:auto auto 1fr;gap:12px 40px;align-items:end}
+.nowrow .row{justify-content:flex-end}
+.big{display:block;font:700 clamp(2rem,6vw,3.6rem)/1.05 var(--mono);font-stretch:100%;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.mid{display:block;font:500 clamp(1.1rem,2.6vw,1.5rem)/1.2 var(--mono);font-stretch:87.5%;color:var(--muted);font-variant-numeric:tabular-nums;padding-bottom:4px}
+@media (max-width:860px){.nowrow{grid-template-columns:1fr}.nowrow .row{justify-content:flex-start}}
+.kv dd .cp{margin-left:6px;vertical-align:middle;font-family:var(--ui);min-height:26px;padding:3px 8px;font-size:.78rem}
+input[type=datetime-local]{color-scheme:inherit}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel now">
+ <div class="nowrow">
+  <div><span class="hint">Current Unix time (seconds)</span><output id="nowS" class="big"></output></div>
+  <div><span class="hint">Milliseconds</span><output id="nowMs" class="mid"></output></div>
+  <div class="row"><button class="btn sm" type="button" id="cS">Copy seconds</button><button class="btn sm" type="button" id="cMs">Copy milliseconds</button><button class="btn sm ghost" type="button" id="pause" aria-pressed="false">Pause</button></div>
+ </div>
+</section>
+<div class="cols" style="margin-top:28px">
+ <section class="panel">
+  <div class="panel-h"><label class="h" for="ts">Timestamp to date</label><button class="btn sm ghost" type="button" id="useNow">Use now</button></div>
+  <input type="text" id="ts" inputmode="numeric" spellcheck="false" autocomplete="off" placeholder="1759248000">
+  <div id="tsRes" class="mt" aria-live="polite"></div>
+ </section>
+ <section class="panel">
+  <div class="panel-h"><label class="h" for="dt">Date to timestamp</label>
+   <div class="seg" role="group" aria-label="Time zone of the date"><button type="button" data-z="local">Local time</button><button type="button" data-z="utc">UTC</button></div></div>
+  <input type="datetime-local" id="dt" step="1" class="field">
+  <div id="dtRes" class="mt" aria-live="polite"></div>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("unix-timestamp");
+
+const $=DT.$,s=Object.assign({z:"local"},DT.get("unixts",{}));let paused=false;
+function tick(){if(paused)return;const n=Date.now();$("#nowS").textContent=Math.floor(n/1000);$("#nowMs").textContent=n}
+setInterval(tick,250);tick();
+$("#cS").onclick=e=>DT.copy($("#nowS").textContent,e.currentTarget);$("#cMs").onclick=e=>DT.copy($("#nowMs").textContent,e.currentTarget);
+$("#pause").onclick=e=>{paused=!paused;e.currentTarget.textContent=paused?"Resume":"Pause";e.currentTarget.setAttribute("aria-pressed",paused);tick()};
+const rtf=new Intl.RelativeTimeFormat(undefined,{numeric:"auto"});
+function rel(ms){const d=(ms-Date.now())/1000,a=Math.abs(d);const u=[[60,"second",1],[3600,"minute",60],[86400,"hour",3600],[2592000,"day",86400],[31536000,"month",2592000],[Infinity,"year",31536000]];
+ for(const [lim,n,div] of u)if(a<lim)return rtf.format(Math.round(d/div),n)}
+function row(k,v){return`<dt>${k}</dt><dd>${DT.esc(v)} <button class="btn sm ghost cp" type="button" data-v="${DT.attr(v)}">Copy</button></dd>`}
+function wire(o){DT.$$(".cp",o).forEach(b=>b.onclick=()=>DT.copy(b.dataset.v,b))}
+function fromTs(){const raw=$("#ts").value.trim().replace(/[,_\s]/g,""),o=$("#tsRes");if(!raw){o.innerHTML="";return}
+ if(!/^-?\d+(\.\d+)?$/.test(raw)){o.innerHTML='<p class="status bad">Enter digits only<span class="sub">A Unix timestamp is a count of seconds (or milliseconds) since January 1, 1970 UTC.</span></p>';return}
+ const n=parseFloat(raw),digits=raw.replace(/^-|\..*$/g,"").length;let ms,unit;
+ if(digits<=11){ms=n*1000;unit="seconds"}else if(digits<=14){ms=n;unit="milliseconds"}else if(digits<=17){ms=n/1000;unit="microseconds"}else{ms=n/1e6;unit="nanoseconds"}
+ const d=new Date(ms);if(isNaN(d)){o.innerHTML='<p class="status bad">That timestamp is out of range.</p>';return}
+ const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+ o.innerHTML=`<p class="hint">Read as ${unit}. ${rel(ms)}.</p><dl class="kv mt">${row("Your time ("+tz+")",d.toLocaleString(undefined,{dateStyle:"full",timeStyle:"long"}))}${row("UTC",d.toLocaleString("en-US",{timeZone:"UTC",dateStyle:"full",timeStyle:"long"}))}${row("ISO 8601",d.toISOString())}${row("RFC 2822",d.toUTCString())}${row("Seconds",String(Math.floor(ms/1000)))}${row("Milliseconds",String(Math.floor(ms)))}</dl>`;wire(o)}
+function fromDt(){DT.set("unixts",s);DT.$$("[data-z]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.z===s.z));
+ const v=$("#dt").value,o=$("#dtRes");if(!v){o.innerHTML='<p class="hint">Pick a date and time.</p>';return}
+ const d=s.z==="utc"?new Date(v+(v.length===16?":00":"")+"Z"):new Date(v);if(isNaN(d)){o.innerHTML="";return}
+ o.innerHTML=`<dl class="kv">${row("Seconds",String(Math.floor(d.getTime()/1000)))}${row("Milliseconds",String(d.getTime()))}${row("ISO 8601",d.toISOString())}</dl><p class="hint mt">${rel(d.getTime())}.</p>`;wire(o)}
+$("#ts").addEventListener("input",fromTs);$("#dt").addEventListener("input",fromDt);
+$("#useNow").onclick=()=>{$("#ts").value=Math.floor(Date.now()/1000);fromTs()};
+DT.$$("[data-z]").forEach(b=>b.onclick=()=>{s.z=b.dataset.z;fromDt()});
+const n=new Date();n.setSeconds(0,0);$("#dt").value=new Date(n-n.getTimezoneOffset()*60000).toISOString().slice(0,19);
+$("#ts").value=Math.floor(Date.now()/1000);fromTs();fromDt();
+
+</script>
+</body>
+</html>

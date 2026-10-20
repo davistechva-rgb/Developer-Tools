@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Font Previewer | Developer Tools</title>
+<meta name="description" content="Compare fonts on your own sample text">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.fl{display:grid;gap:18px;margin-top:28px}
+.fc{padding:14px 18px}
+.fc-h{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}.fc-h button{margin-left:auto}
+.fs{margin:10px 0 0;line-height:1.25;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row"><label class="sr" for="txt">Sample text</label><input type="text" id="txt" style="flex:2;min-width:240px;font-family:var(--ui);font-size:1rem">
+  <label class="row" style="gap:8px"><span class="lbl" style="margin:0">Size</span><input type="range" id="size" min="10" max="96" style="width:140px"><output id="sizeV" class="code"></output></label>
+  <select id="wt" aria-label="Weight"><option value="300">Light</option><option value="400">Regular</option><option value="600">Semibold</option><option value="700">Bold</option></select>
+  <label class="chk"><input type="checkbox" id="ital"> Italic</label>
+ </div>
+ <div class="row mt">
+  <div class="seg" role="group" aria-label="Filter"><button type="button" data-f="installed">On this device</button><button type="button" data-f="all">All in list</button></div>
+  <select id="cat" aria-label="Category"><option value="">All kinds</option><option>Sans serif</option><option>Serif</option><option>Monospace</option><option>Display</option></select>
+  <input type="search" id="q" placeholder="Filter fonts" style="max-width:200px;font-family:var(--ui)">
+ </div>
+ <div class="row mt"><label class="sr" for="gf">Google Font name</label><input type="text" id="gf" placeholder="Try a Google Font, like Lora or Space Grotesk" style="max-width:340px;font-family:var(--ui)"><button class="btn sm" type="button" id="gfb">Load it</button><span class="hint" id="gfm"></span></div>
+</section>
+<div id="list" class="fl"></div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("font-previewer");
+
+const $=DT.$,s=Object.assign({txt:"The quick brown fox jumps over the lazy dog 0123456789",size:32,wt:"400",ital:false,f:"installed",cat:"",added:[]},DT.get("fonts",{}));
+const FONTS=[["Arial","Sans serif"],["Helvetica","Sans serif"],["Helvetica Neue","Sans serif"],["Segoe UI","Sans serif"],["Calibri","Sans serif"],["Verdana","Sans serif"],["Tahoma","Sans serif"],["Trebuchet MS","Sans serif"],["Gill Sans","Sans serif"],["Futura","Sans serif"],["Avenir","Sans serif"],["Avenir Next","Sans serif"],["Roboto","Sans serif"],["Open Sans","Sans serif"],["Noto Sans","Sans serif"],["Ubuntu","Sans serif"],["Cantarell","Sans serif"],["DejaVu Sans","Sans serif"],["Liberation Sans","Sans serif"],["San Francisco","Sans serif"],["SF Pro Text","Sans serif"],["Aptos","Sans serif"],["Candara","Sans serif"],["Corbel","Sans serif"],["Franklin Gothic Medium","Sans serif"],["Lucida Grande","Sans serif"],["Optima","Sans serif"],["Atkinson Hyperlegible","Sans serif"],
+ ["Times New Roman","Serif"],["Georgia","Serif"],["Garamond","Serif"],["Palatino","Serif"],["Palatino Linotype","Serif"],["Book Antiqua","Serif"],["Cambria","Serif"],["Constantia","Serif"],["Baskerville","Serif"],["Didot","Serif"],["Hoefler Text","Serif"],["Charter","Serif"],["Noto Serif","Serif"],["DejaVu Serif","Serif"],["Liberation Serif","Serif"],["Rockwell","Serif"],
+ ["Consolas","Monospace"],["Cascadia Code","Monospace"],["Cascadia Mono","Monospace"],["Courier New","Monospace"],["Lucida Console","Monospace"],["Menlo","Monospace"],["Monaco","Monospace"],["SF Mono","Monospace"],["Fira Code","Monospace"],["JetBrains Mono","Monospace"],["Source Code Pro","Monospace"],["DejaVu Sans Mono","Monospace"],["Liberation Mono","Monospace"],["Ubuntu Mono","Monospace"],["Martian Mono","Monospace"],
+ ["Impact","Display"],["Comic Sans MS","Display"],["Papyrus","Display"],["Brush Script MT","Display"],["Copperplate","Display"],["Segoe Script","Display"],["Segoe Print","Display"],["Chalkboard","Display"],["Marker Felt","Display"]];
+const ctx=document.createElement("canvas").getContext("2d");const T="mmmmmmmmmmlli1WQ@#0";
+function has(f){return["monospace","serif","sans-serif"].some(b=>{ctx.font=`72px ${b}`;const w=ctx.measureText(T).width;ctx.font=`72px "${f}", ${b}`;return ctx.measureText(T).width!==w})}
+let avail={};
+function all(){return[...s.added.map(n=>[n,"Added"]),...FONTS]}
+function run(){DT.set("fonts",s);DT.$$("[data-f]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.f===s.f));$("#sizeV").textContent=s.size+"px";
+ const q=$("#q").value.toLowerCase();
+ const L=all().filter(([n,c])=>(s.f==="all"||avail[n]||c==="Added")&&(!s.cat||c===s.cat||c==="Added")&&(!q||n.toLowerCase().includes(q)));
+ $("#list").innerHTML=L.length?L.map(([n,c])=>`<article class="panel fc"><div class="fc-h"><b>${DT.esc(n)}</b><span class="hint">${c}${avail[n]||c==="Added"?"":", not on this device"}</span><button class="btn sm ghost" type="button" data-cp="${DT.attr(n)}">Copy CSS</button></div>
+  <p class="fs" style="font-family:'${n.replace(/'/g,"")}',${c==="Monospace"?"monospace":c==="Serif"?"serif":"sans-serif"};font-size:${s.size}px;font-weight:${s.wt};font-style:${s.ital?"italic":"normal"}">${DT.esc(s.txt||"Sample text")}</p></article>`).join("")
+  :`<p class="hint">No fonts match. ${s.f==="installed"?"Try “All in list”.":""}</p>`;
+ DT.$$("[data-cp]").forEach(b=>b.onclick=()=>{const n=b.dataset.cp,c=(all().find(x=>x[0]===n)||[])[1];DT.copy(`font-family: "${n}", ${c==="Monospace"?"ui-monospace, monospace":c==="Serif"?"Georgia, serif":"system-ui, sans-serif"};`,b)})}
+$("#txt").value=s.txt;$("#txt").oninput=DT.debounce(e=>{s.txt=$("#txt").value;run()},120);
+$("#size").value=s.size;$("#size").oninput=e=>{s.size=+e.target.value;run()};
+$("#wt").value=s.wt;$("#wt").onchange=e=>{s.wt=e.target.value;run()};$("#ital").checked=s.ital;$("#ital").onchange=e=>{s.ital=e.target.checked;run()};
+$("#cat").value=s.cat;$("#cat").onchange=e=>{s.cat=e.target.value;run()};$("#q").oninput=DT.debounce(run,100);
+DT.$$("[data-f]").forEach(b=>b.onclick=()=>{s.f=b.dataset.f;run()});
+function loadGF(n,quiet){return new Promise(res=>{const l=document.createElement("link");l.rel="stylesheet";l.href=`https://fonts.googleapis.com/css2?family=${encodeURIComponent(n).replace(/%20/g,"+")}:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap`;
+ l.onload=()=>document.fonts.load(`32px "${n}"`).then(f=>res(f.length>0));l.onerror=()=>res(false);document.head.appendChild(l)})}
+$("#gfb").onclick=async()=>{const n=$("#gf").value.trim().replace(/\s+/g," ");if(!n)return;$("#gfm").textContent="Loading…";
+ const ok=await loadGF(n);if(ok){avail[n]=true;if(!s.added.includes(n))s.added.unshift(n);$("#gfm").textContent=`Loaded ${n}.`;$("#gf").value="";run()}
+ else $("#gfm").textContent=`Couldn't load “${n}”. Check the spelling on fonts.google.com, and that you're online.`};
+$("#gf").onkeydown=e=>{if(e.key==="Enter")$("#gfb").click()};
+document.fonts.ready.then(()=>{FONTS.forEach(([n])=>avail[n]=has(n));s.added.forEach(n=>loadGF(n).then(ok=>{avail[n]=ok;run()}));run()});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Date Calculator | Developer Tools</title>
+<meta name="description" content="Days between dates, and add or subtract time">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.bigr output{display:block;font:700 clamp(1.6rem,4.5vw,2.6rem)/1.15 var(--mono);font-stretch:87.5%}
+.bigr p{margin:6px 0 14px;font-size:1.1rem}
+input[type=date]{color-scheme:inherit}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="seg" role="group" aria-label="Mode" style="margin-bottom:18px;flex-wrap:wrap"><button type="button" data-m="diff">Time between dates</button><button type="button" data-m="add">Add or subtract</button><button type="button" data-m="info">About a date</button></div>
+<section class="panel" id="diffP">
+ <div class="row"><div><label class="lbl" for="d1">Start</label><input type="date" id="d1" class="field" style="width:auto"></div><div><label class="lbl" for="d2">End</label><input type="date" id="d2" class="field" style="width:auto"></div>
+  <label class="chk" style="align-self:flex-end"><input type="checkbox" id="incl"> Count the end date too</label><button class="btn sm ghost" type="button" id="today2" style="align-self:flex-end">End is today</button></div>
+ <div class="bigr mt" id="diffR" aria-live="polite"></div>
+</section>
+<section class="panel" id="addP" hidden>
+ <div class="row"><div><label class="lbl" for="a1">Start date</label><input type="date" id="a1" class="field" style="width:auto"></div>
+  <div class="seg" role="group" aria-label="Direction" style="align-self:flex-end"><button type="button" data-op="1">Add</button><button type="button" data-op="-1">Subtract</button></div>
+  <div><label class="lbl" for="an">Amount</label><input type="number" id="an" min="0" style="width:100px"></div>
+  <div><label class="lbl" for="au">Unit</label><select id="au"><option value="d">Days</option><option value="bd">Business days (Mon–Fri)</option><option value="w">Weeks</option><option value="m">Months</option><option value="y">Years</option></select></div></div>
+ <div class="bigr mt" id="addR" aria-live="polite"></div>
+</section>
+<section class="panel" id="infoP" hidden>
+ <div><label class="lbl" for="i1">Date</label><input type="date" id="i1" class="field" style="width:auto"></div>
+ <dl class="kv mt" id="infoR"></dl>
+</section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("date-calculator");
+
+const $=DT.$;const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const P=v=>{const [y,m,d]=v.split("-").map(Number);return new Date(y,m-1,d)};const today=iso(new Date());
+const s=Object.assign({m:"diff",d1:today,d2:iso(new Date(new Date().getFullYear(),11,31)),incl:false,a1:today,op:1,an:30,au:"d",i1:today},DT.get("datecalc",{}));
+const long=d=>d.toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+const dayN=(a,b)=>Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/864e5);
+function ymd(a,b){let y=b.getFullYear()-a.getFullYear(),m=b.getMonth()-a.getMonth(),d=b.getDate()-a.getDate();if(d<0){m--;d+=new Date(b.getFullYear(),b.getMonth(),0).getDate()}if(m<0){y--;m+=12}return[y,m,d]}
+function bdays(a,b){let n=0;const d=new Date(a);while(d<b){const w=d.getDay();if(w&&w<6)n++;d.setDate(d.getDate()+1)}return n}
+const pl=(n,w)=>`${n.toLocaleString()} ${w}${n===1?"":"s"}`;
+function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return[Math.ceil(((t-y)/864e5+1)/7),t.getUTCFullYear()]}
+function run(){DT.set("datecalc",s);DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===s.m));DT.$$("[data-op]").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.op===s.op));
+ ["diff","add","info"].forEach(m=>$("#"+m+"P").hidden=s.m!==m);
+ if(s.m==="diff"&&s.d1&&s.d2){let a=P(s.d1),b=P(s.d2),neg=false;if(b<a){[a,b]=[b,a];neg=true}const end=new Date(b);if(s.incl)end.setDate(end.getDate()+1);
+  const n=dayN(a,end),[y,m,d]=ymd(a,end),bd=bdays(a,end);
+  $("#diffR").innerHTML=`<output>${pl(n,"day")}</output><p>${[y&&pl(y,"year"),m&&pl(m,"month"),(d||(!y&&!m))&&pl(d,"day")].filter(Boolean).join(", ")}${neg?" (the end is before the start)":""}</p>
+  <dl class="kv"><dt>Weeks</dt><dd>${Math.floor(n/7)} weeks, ${n%7} days</dd><dt>Business days</dt><dd>${bd.toLocaleString()} (Monday to Friday, holidays not removed)</dd><dt>Weekend days</dt><dd>${(n-bd).toLocaleString()}</dd><dt>Hours</dt><dd>${(n*24).toLocaleString()}</dd></dl>`}
+ if(s.m==="add"&&s.a1){const d=P(s.a1),n=(+s.an||0)*s.op;
+  if(s.au==="d")d.setDate(d.getDate()+n);else if(s.au==="w")d.setDate(d.getDate()+n*7);
+  else if(s.au==="m"||s.au==="y"){const k=s.au==="m"?n:n*12,day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+k);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()))}
+  else{let left=Math.abs(n);const st=Math.sign(n)||1;while(left>0){d.setDate(d.getDate()+st);const w=d.getDay();if(w&&w<6)left--}}
+  $("#addR").innerHTML=`<output>${long(d)}</output><p class="code">${iso(d)}</p><p class="hint">${(()=>{const k=dayN(new Date(new Date().toDateString()),d);return k===0?"That's today.":k>0?`${pl(k,"day")} from today.`:`${pl(-k,"day")} ago.`})()}</p>`}
+ if(s.m==="info"&&s.i1){const d=P(s.i1),y=d.getFullYear(),doy=dayN(new Date(y,0,1),d)+1,leap=(y%4===0&&y%100!==0)||y%400===0,[wk,wy]=isoWeek(d),k=dayN(new Date(new Date().toDateString()),d);
+  $("#infoR").innerHTML=`<dt>Date</dt><dd>${long(d)}</dd><dt>Day of the year</dt><dd>${doy} of ${leap?366:365}</dd><dt>Days left in the year</dt><dd>${(leap?366:365)-doy}</dd><dt>ISO week</dt><dd>Week ${wk} of ${wy}</dd><dt>Quarter</dt><dd>Q${Math.floor(d.getMonth()/3)+1}</dd><dt>Leap year</dt><dd>${leap?"Yes":"No"}</dd><dt>From today</dt><dd>${k===0?"Today":k>0?`In ${pl(k,"day")}`:`${pl(-k,"day")} ago`}</dd><dt>Unix time (midnight UTC)</dt><dd>${Date.UTC(y,d.getMonth(),d.getDate())/1000}</dd>`}}
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.m=b.dataset.m;run()});DT.$$("[data-op]").forEach(b=>b.onclick=()=>{s.op=+b.dataset.op;run()});
+[["d1","value"],["d2","value"],["incl","checked"],["a1","value"],["an","value"],["au","value"],["i1","value"]].forEach(([id,p])=>{$("#"+id)[p]=s[id];$("#"+id).addEventListener(p==="checked"||id==="au"?"change":"input",e=>{s[id]=e.target[p];run()})});
+$("#today2").onclick=()=>{s.d2=iso(new Date());$("#d2").value=s.d2;run()};
+run();
+
+</script>
+</body>
+</html>

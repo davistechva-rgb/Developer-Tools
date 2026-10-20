@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Regex Generator | Developer Tools</title>
+<meta name="description" content="Build common patterns from plain options">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.tr{margin-bottom:12px}
+.big-rx{font-size:1rem;color:var(--accent);word-break:break-all}
+#snips th{white-space:nowrap;color:var(--ink);width:100px}#snips td.code{word-break:break-all;font-size:.82rem}
+.tests{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.tests li{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-left:3px solid var(--good);background:var(--inset)}
+.tests li.no{border-left-color:var(--bad)}.tests li .code{word-break:break-all}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols">
+ <section class="panel"><div class="panel-h"><h2>What should it match?</h2></div>
+  <div class="seg" role="group" aria-label="Builder" style="flex-wrap:wrap"><button type="button" data-t="preset">Common pattern</button><button type="button" data-t="text">Text rules</button><button type="button" data-t="pw">Password rules</button></div>
+  <div id="presetB" class="mt">
+   <label class="lbl" for="preset">Pattern</label><select id="preset" style="width:100%"></select>
+   <p class="hint mt" id="pNote"></p>
+  </div>
+  <div id="textB" class="mt" hidden>
+   <div class="tr"><label class="lbl" for="sw">Starts with</label><input type="text" id="sw" spellcheck="false"></div>
+   <div class="tr"><label class="lbl" for="co">Contains</label><input type="text" id="co" spellcheck="false"></div>
+   <div class="tr"><label class="lbl" for="ew">Ends with</label><input type="text" id="ew" spellcheck="false"></div>
+   <div class="tr"><label class="lbl" for="no">Doesn't contain</label><input type="text" id="no" spellcheck="false"></div>
+   <p class="hint">Special characters are escaped for you, so a period means a real period.</p>
+  </div>
+  <div id="pwB" class="mt" hidden>
+   <div class="row"><label class="row" style="gap:8px"><span class="lbl" style="margin:0">Length from</span><input type="number" id="pmin" min="1" style="width:80px"></label><label class="row" style="gap:8px"><span class="lbl" style="margin:0">to</span><input type="number" id="pmax" min="0" style="width:80px" placeholder="any"></label></div>
+   <div class="row mt"><label class="chk"><input type="checkbox" id="pu"> An uppercase letter</label><label class="chk"><input type="checkbox" id="pl"> A lowercase letter</label><label class="chk"><input type="checkbox" id="pd"> A number</label><label class="chk"><input type="checkbox" id="ps"> A symbol</label><label class="chk"><input type="checkbox" id="pn"> No spaces</label></div>
+  </div>
+  <div class="row mt">
+   <div class="seg" role="group" aria-label="Scope"><button type="button" data-a="1">Whole value must match</button><button type="button" data-a="0">Find inside text</button></div>
+   <label class="chk"><input type="checkbox" id="ci"> Ignore case</label>
+  </div>
+ </section>
+ <section class="panel"><div class="panel-h"><h2>Your regex</h2><div class="row"><button class="btn sm" type="button" id="cp">Copy</button><a class="btn sm" id="open" href="../regex-tester/index.html">Open in Regex Tester</a></div></div>
+  <pre class="out wrapit big-rx" id="rx" style="min-height:0"></pre>
+  <table class="t mt" id="snips"><tbody></tbody></table>
+  <label class="lbl mt" for="test">Try it (one test per line)</label>
+  <textarea id="test" spellcheck="false" style="min-height:150px"></textarea>
+  <ul class="tests" id="tres" aria-live="polite"></ul>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("regex-generator");
+
+const $=DT.$,s=Object.assign({t:"preset",preset:"email",anchor:true,ci:false,sw:"",co:"",ew:"",no:"",pmin:12,pmax:"",pu:true,pl:true,pd:true,ps:true,pn:true},DT.get("rxgen",{}));
+const P={
+ email:["Email address","[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}","Covers real-world addresses. No regex can fully validate email; send a confirmation to be sure.","someone@example.com\nfirst.last+tag@mail.co.uk\nnot-an-email@\n@example.com"],
+ url:["Web address (URL)","https?:\\/\\/[\\w.-]+(?:\\.[\\w-]+)+(?::\\d+)?(?:\\/[^\\s]*)?","http or https, with optional port, path, and query.","https://davis-tech-support.com/services?x=1\nhttp://10.0.0.1:8443/\nftp://example.com\nexample.com"],
+ domain:["Domain name","(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}","Hostname with at least one dot, labels up to 63 characters.","davis-tech-support.com\nmail.google.com\n-bad-.com\nlocalhost"],
+ ipv4:["IPv4 address","(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)","Each part checked for 0 to 255.","192.168.1.1\n10.0.0.254\n256.1.1.1\n1.2.3"],
+ cidr:["IPv4 with CIDR prefix","(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\/(?:3[0-2]|[12]?\\d)","Like 10.0.0.0/24, prefix 0 to 32.","10.0.0.0/24\n192.168.0.0/16\n10.0.0.0/33\n10.0.0.0"],
+ ipv6:["IPv6 address","(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,7}:|(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}:){1,5}(?::[0-9A-Fa-f]{1,4}){1,2}|(?:[0-9A-Fa-f]{1,4}:){1,4}(?::[0-9A-Fa-f]{1,4}){1,3}|(?:[0-9A-Fa-f]{1,4}:){1,3}(?::[0-9A-Fa-f]{1,4}){1,4}|(?:[0-9A-Fa-f]{1,4}:){1,2}(?::[0-9A-Fa-f]{1,4}){1,5}|[0-9A-Fa-f]{1,4}:(?::[0-9A-Fa-f]{1,4}){1,6}|:(?::[0-9A-Fa-f]{1,4}){1,7}|::","Full and compressed forms (::). Doesn't cover embedded IPv4.","2001:db8::1\nfe80::1ff:fe23:4567:890a\n::1\n2001:db8:::1"],
+ mac:["MAC address","(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\\.){2}[0-9A-Fa-f]{4}","Colon, hyphen, or Cisco dot format.","00:1A:2B:3C:4D:5E\n00-1a-2b-3c-4d-5e\n001a.2b3c.4d5e\n00:1A:2B:3C:4D"],
+ phone:["US phone number","(?:\\+?1[-. ]?)?\\(?\\d{3}\\)?[-. ]?\\d{3}[-. ]?\\d{4}","Optional +1, with or without parentheses, dashes, dots, or spaces.","434-294-4456\n(434) 294 4456\n+1 434.294.4456\n294-4456"],
+ zip:["US ZIP code","\\d{5}(?:-\\d{4})?","5 digits, or ZIP+4.","23901\n23901-1234\n2390\n239011"],
+ dateIso:["Date (YYYY-MM-DD)","\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])","ISO 8601. Checks month and day ranges, not days per month.","2026-09-30\n2026-13-01\n26-09-30"],
+ dateUs:["Date (MM/DD/YYYY)","(?:0?[1-9]|1[0-2])\\/(?:0?[1-9]|[12]\\d|3[01])\\/\\d{4}","US order, leading zeros optional.","09/30/2026\n9/3/2026\n30/09/2026"],
+ time24:["Time (24-hour)","(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?","HH:MM with optional seconds.","09:30\n23:59:59\n24:00\n9:30"],
+ time12:["Time (12-hour)","(?:0?[1-9]|1[0-2]):[0-5]\\d\\s?(?:[AaPp][Mm])","With AM or PM.","9:30 AM\n12:00pm\n13:00 PM"],
+ hex:["Hex color","#(?:[0-9A-Fa-f]{3}){1,2}\\b|#[0-9A-Fa-f]{8}\\b","#RGB, #RRGGBB, or #RRGGBBAA.","#0F2A4A\n#fff\n#12345\nF2B33D"],
+ uuid:["UUID or GUID","[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}","Any version, with hyphens.","550e8400-e29b-41d4-a716-446655440000\n550e8400e29b41d4a716446655440000"],
+ semver:["Version number (semver)","(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[\\w.-]+)?(?:\\+[\\w.-]+)?","Like 1.4.2 or 2.0.0-beta.1.","1.4.2\n2.0.0-beta.1\n1.4\n01.2.3"],
+ slug:["URL slug","[a-z0-9]+(?:-[a-z0-9]+)*","Lowercase words joined by single hyphens.","managed-it-services\nIT-Services\nbad--slug"],
+ user:["Username","[A-Za-z][A-Za-z0-9_.-]{2,19}","Starts with a letter, 3 to 20 characters.","mdavis\nm.davis_2\n2cool\nab"],
+ ssn:["US Social Security number format","(?!000|666|9\\d\\d)\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}","Finds numbers shaped like an SSN, for spotting them in logs or exports.","123-45-6789\n000-12-3456\n123456789"],
+ card:["Credit card number format","(?:\\d[ -]?){12,18}\\d","13 to 19 digits with optional spaces or dashes. Useful for finding card numbers in data; it doesn't check validity.","4111 1111 1111 1111\n4111-1111-1111-1111\n1234"],
+ winpath:["Windows file path","[A-Za-z]:\\\\(?:[^\\\\/:*?\"<>|\\r\\n]+\\\\)*[^\\\\/:*?\"<>|\\r\\n]*","Drive letter paths like C:\\Users\\name.","C:\\Users\\micha\\Downloads\nD:\\\nC:/Users"],
+ unc:["Network share (UNC path)","\\\\\\\\[\\w.-]+\\\\[\\w$ .-]+(?:\\\\[^\\\\/:*?\"<>|\\r\\n]+)*","Like \\\\server\\share\\folder.","\\\\fileserver\\staff\\docs\n\\\\nas\\backup$\n\\server\\share"]};
+Object.entries(P).forEach(([k,v])=>$("#preset").insertAdjacentHTML("beforeend",`<option value="${k}">${v[0]}</option>`));
+const esc=x=>x.replace(/[.*+?^${}()|[\]\\\/]/g,"\\$&");
+function core(){
+ if(s.t==="preset")return P[s.preset][1];
+ if(s.t==="text"){let r="";if(s.no)r+=`(?!.*${esc(s.no)})`;if(s.sw)r+=esc(s.sw);r+=s.co?`.*${esc(s.co)}.*`:(s.sw||s.ew?".*":"");if(s.ew)r+=esc(s.ew);return r||".*"}
+ let r="";if(s.pu)r+="(?=.*[A-Z])";if(s.pl)r+="(?=.*[a-z])";if(s.pd)r+="(?=.*\\d)";if(s.ps)r+="(?=.*[^A-Za-z0-9\\s])";if(s.pn)r+="(?!.*\\s)";
+ const mn=Math.max(1,+s.pmin||1),mx=s.pmax===""?"":Math.max(mn,+s.pmax);return r+`.{${mn},${mx}}`}
+function full(){const c=core(),anch=s.t==="pw"||s.anchor;const body=c.includes("|")?`(?:${c})`:c;
+ return anch?`^${body}$`:(s.t==="preset"?`(?<![\\w])${body}(?![\\w])`:body)}
+function flags(){return(s.ci?"i":"")+(s.anchor||s.t==="pw"?"":"g")}
+function snips(r,f){const py=r.includes("'")?`r"${r}"`:`r'${r}'`;return[["JavaScript",`/${r.replace(/\//g,"\\/").replace(/\\\\\//g,"\\/")}/${f}`],["Python",`re.compile(${py}${s.ci?", re.IGNORECASE":""})`],["PowerShell",`'value' -${s.ci?"i":"c"}match '${r.replace(/'/g,"''")}'`],["C#",`new Regex(@"${r.replace(/"/g,'""')}"${s.ci?", RegexOptions.IgnoreCase":""})`]]}
+function run(){DT.set("rxgen",s);
+ DT.$$("[data-t]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===s.t));DT.$$("[data-a]").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.a===+s.anchor));
+ $("#presetB").hidden=s.t!=="preset";$("#textB").hidden=s.t!=="text";$("#pwB").hidden=s.t!=="pw";
+ DT.$$("[data-a]").forEach(b=>b.disabled=s.t==="pw");
+ if(s.t==="preset")$("#pNote").textContent=P[s.preset][2];
+ const r=full(),f=flags();$("#rx").textContent=r;
+ $("#snips tbody").innerHTML=snips(r,f).map(([a,b],i)=>`<tr><th scope="row">${a}</th><td class="code">${DT.esc(b)}</td><td style="width:1%"><button class="btn sm" type="button" data-sn="${i}">Copy</button></td></tr>`).join("");
+ DT.$$("[data-sn]").forEach(b=>b.onclick=()=>DT.copy(snips(r,f)[b.dataset.sn][1],b));
+ let re;try{re=new RegExp(r,s.ci?"i":"")}catch(e){$("#tres").innerHTML=`<li class="no">${DT.esc(e.message)}</li>`;return}
+ $("#tres").innerHTML=$("#test").value.split("\n").filter(x=>x!=="").map(x=>{const m=re.exec(x);return`<li class="${m?"ok":"no"}"><span class="code">${DT.esc(x)}</span><span class="hint">${m?(s.anchor||s.t==="pw"?"matches":"found: "+DT.esc(m[0])):"no match"}</span></li>`}).join("");
+ localStorage.setItem("dt:regex",JSON.stringify(Object.assign(DT.get("regex",{}),{pat:r,flags:s.anchor||s.t==="pw"?(s.ci?"im":"m"):f,txt:$("#test").value,m:"list"})))}
+DT.$$("[data-t]").forEach(b=>b.onclick=()=>{s.t=b.dataset.t;setTests();run()});
+DT.$$("[data-a]").forEach(b=>b.onclick=()=>{s.anchor=b.dataset.a==="1";run()});
+function setTests(){if(s.t==="preset")$("#test").value=P[s.preset][3];else if(s.t==="pw")$("#test").value="Summer2024!\ncorrect horse battery\nTr0ub4dor&3xyz\nshort1!A";else if(!$("#test").value)$("#test").value="example text"}
+$("#preset").value=s.preset;$("#preset").onchange=e=>{s.preset=e.target.value;setTests();run()};
+["sw","co","ew","no","pmin","pmax"].forEach(id=>{$("#"+id).value=s[id];$("#"+id).oninput=e=>{s[id]=e.target.value;run()}});
+["ci","pu","pl","pd","ps","pn"].forEach(id=>{$("#"+id).checked=s[id];$("#"+id).onchange=e=>{s[id]=e.target.checked;run()}});
+$("#test").addEventListener("input",DT.debounce(run,150));$("#cp").onclick=e=>DT.copy($("#rx").textContent,e.currentTarget);
+setTests();run();
+
+</script>
+</body>
+</html>

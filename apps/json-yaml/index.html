@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JSON ↔ YAML Converter | Developer Tools</title>
+<meta name="description" content="Convert between JSON and YAML in either direction">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style></style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="row" style="margin-bottom:18px">
+ <label class="row" style="gap:8px"><span class="lbl" style="margin:0">Indent</span><select id="ind"><option value="2">2 spaces</option><option value="4">4 spaces</option></select></label>
+ <label class="chk"><input type="checkbox" id="sort"> Sort keys A–Z</label>
+ <button class="btn sm ghost" type="button" id="sample">Load example</button>
+</div>
+<div class="cols">
+ <section class="panel"><div class="panel-h"><label class="h" for="j">JSON</label><div class="row"><button class="btn sm" type="button" data-copy="j">Copy</button><button class="btn sm" type="button" data-dl="j">Download</button></div></div>
+  <textarea id="j" class="nowrap" spellcheck="false" placeholder="Paste JSON to get YAML" style="min-height:420px"></textarea><div id="jErr" class="mt" aria-live="polite"></div></section>
+ <section class="panel"><div class="panel-h"><label class="h" for="y">YAML</label><div class="row"><button class="btn sm" type="button" data-copy="y">Copy</button><button class="btn sm" type="button" data-dl="y">Download</button></div></div>
+  <textarea id="y" class="nowrap" spellcheck="false" placeholder="Or paste YAML to get JSON" style="min-height:420px"></textarea><div id="yErr" class="mt" aria-live="polite"></div></section>
+</div>
+<p class="hint mt">Type in either side and the other updates. YAML comments don't carry over to JSON, since JSON has no comments.</p>
+</main>
+<script src="../../shared/vendor/js-yaml.min.js"></script>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("json-yaml");
+
+const $=DT.$,s=Object.assign({ind:"2",sort:false},DT.get("jsonyaml",{}));let last="j";
+$("#ind").value=s.ind;$("#sort").checked=s.sort;
+const SAMPLE={name:"office-network",vlans:[{id:10,name:"Staff",subnet:"10.0.10.0/24"},{id:20,name:"Guest",subnet:"10.0.20.0/24",isolated:true}],dns:["1.1.1.1","9.9.9.9"],backup:null};
+function err(where,title,sub){$(where).innerHTML=`<p class="status bad">${title}<span class="sub">${DT.esc(sub)}</span></p>`}
+function fromJ(){last="j";$("#yErr").innerHTML="";const t=$("#j").value;if(!t.trim()){$("#y").value="";$("#jErr").innerHTML="";return}
+ try{let v=JSON.parse(t);if(s.sort)v=DT.sortKeys(v);$("#y").value=jsyaml.dump(v,{indent:+s.ind,sortKeys:s.sort,noRefs:true,lineWidth:-1});$("#jErr").innerHTML=""}
+ catch(e){const r=DT.jsonError(t,e);err("#jErr","Not valid JSON"+(r.line?` at line ${r.line}, column ${r.col}`:""),r.msg+".")}}
+function fromY(){last="y";$("#jErr").innerHTML="";const t=$("#y").value;if(!t.trim()){$("#j").value="";$("#yErr").innerHTML="";return}
+ try{const docs=jsyaml.loadAll(t,null,{schema:jsyaml.CORE_SCHEMA});let v=docs.length===1?docs[0]:docs;if(s.sort)v=DT.sortKeys(v);
+  $("#j").value=JSON.stringify(v,null,+s.ind);$("#yErr").innerHTML=docs.length>1?`<p class="hint">${docs.length} YAML documents became a JSON array.</p>`:""}
+ catch(e){const mk=e.mark||{};err("#yErr","Not valid YAML"+(mk.line!=null?` at line ${mk.line+1}, column ${mk.column+1}`:""),(e.reason||e.message).replace(/^./,c=>c.toUpperCase())+".")}}
+function rerun(){DT.set("jsonyaml",s);last==="j"?fromJ():fromY()}
+$("#j").addEventListener("input",DT.debounce(fromJ,200));$("#y").addEventListener("input",DT.debounce(fromY,200));
+$("#ind").onchange=e=>{s.ind=e.target.value;rerun()};$("#sort").onchange=e=>{s.sort=e.target.checked;rerun()};
+DT.$$("[data-copy]").forEach(b=>b.onclick=()=>DT.copy($("#"+b.dataset.copy).value,b));
+DT.$$("[data-dl]").forEach(b=>b.onclick=()=>b.dataset.dl==="j"?DT.download("data.json",$("#j").value,"application/json"):DT.download("data.yaml",$("#y").value,"text/yaml"));
+$("#sample").onclick=()=>{$("#j").value=JSON.stringify(SAMPLE,null,2);fromJ()};
+
+</script>
+</body>
+</html>

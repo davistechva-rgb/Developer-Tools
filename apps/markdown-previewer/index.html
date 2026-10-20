@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Markdown Previewer | Developer Tools</title>
+<meta name="description" content="Paste Markdown and see how it renders">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.doc{font:400 1rem/1.65 var(--ui);color:var(--ink);overflow-wrap:break-word}
+.doc>:first-child{margin-top:0}
+.doc h1,.doc h2,.doc h3,.doc h4{font-family:var(--mono);font-stretch:87.5%;line-height:1.25;margin:1.6em 0 .5em}
+.doc h1{font-size:1.75rem;padding-bottom:.3em;border-bottom:1px solid var(--line-strong)}
+.doc h2{font-size:1.35rem;padding-bottom:.25em;border-bottom:1px solid var(--line)}
+.doc h3{font-size:1.1rem}.doc h4{font-size:1rem}
+.doc p,.doc ul,.doc ol,.doc blockquote,.doc table,.doc pre{margin:0 0 1em}
+.doc a{color:var(--j-key)}
+.doc code{font:400 .88em/1.5 var(--mono);font-stretch:87.5%;background:var(--inset);border:1px solid var(--line);border-radius:var(--r);padding:.1em .35em}
+.doc pre{background:var(--inset);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;overflow:auto}
+.doc pre code{border:0;padding:0;background:none}
+.doc blockquote{border-left:3px solid var(--accent);padding:.2em 0 .2em 1em;color:var(--muted)}
+.doc table{border-collapse:collapse;display:block;overflow-x:auto}
+.doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.doc th{background:var(--raise)}
+.doc img{max-width:100%}
+.doc hr{border:0;border-top:1px solid var(--line-strong);margin:1.6em 0}
+.doc li+li{margin-top:.25em}
+.doc input[type=checkbox]{accent-color:var(--accent);margin-right:.4em}
+.doc li:has(>input[type=checkbox]){list-style:none;margin-left:-1.3em}
+
+.pv{display:grid;grid-template-columns:320px 1fr;gap:28px;align-items:start}
+.pv-side{position:sticky;top:16px}
+.pv .doc{max-width:80ch}
+.toc-h{font:700 1rem/1.3 var(--ui);margin:0 0 6px}
+#toc{display:grid;gap:2px;max-height:40vh;overflow:auto}
+#toc a{text-decoration:none;color:var(--muted);padding:3px 0;font-size:.92rem}#toc a:hover{color:var(--ink)}
+#toc .l2{padding-left:12px}#toc .l3{padding-left:24px}
+@media (max-width:860px){.pv{grid-template-columns:1fr}.pv-side{position:static}}
+@media print{body{background:#fff!important;color:#000}.bar,.pv-side,.tblock,.panel-h{display:none!important}.panel{border:0;padding:0;background:none}.panel::before{display:none}.wrap{padding:0}.pv{display:block}
+ .doc{--ink:#000;--muted:#444;--inset:#f4f4f4;--line:#ccc;--line-strong:#999;--raise:#eee;--j-key:#0645ad;color:#000}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="pv">
+ <aside class="panel pv-side">
+  <div class="panel-h"><h2>Source</h2></div>
+  <div class="drop" id="drop"><strong>Drop a .md file</strong><span class="hint">or click to choose one</span></div>
+  <label class="lbl mt" for="src">Or paste Markdown</label>
+  <textarea id="src" spellcheck="false" placeholder="# README" style="min-height:160px"></textarea>
+  <div id="tocWrap" class="mt" hidden><h2 class="toc-h">Contents</h2><nav id="toc" aria-label="Contents"></nav></div>
+ </aside>
+ <section class="panel">
+  <div class="panel-h"><h2 id="title">Preview</h2><div class="row">
+   <div class="seg" role="group" aria-label="Show"><button type="button" data-m="doc">Rendered</button><button type="button" data-m="html">HTML</button></div>
+   <button class="btn sm" type="button" id="cp">Copy HTML</button><button class="btn sm" type="button" id="pr">Print or save PDF</button></div></div>
+  <div class="doc" id="view" tabindex="0"><p class="hint">Drop a README or paste Markdown on the left to see it formatted.</p></div>
+  <pre class="out" id="html" hidden></pre>
+ </section>
+</div>
+</main>
+<script src="../../shared/vendor/marked.min.js"></script>
+<script src="../../shared/vendor/purify.min.js"></script>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("markdown-previewer");
+
+DOMPurify.addHook("afterSanitizeAttributes",n=>{if(n.tagName==="A"&&/^https?:/i.test(n.getAttribute("href")||"")){n.setAttribute("target","_blank");n.setAttribute("rel","noopener noreferrer")}});
+function mdRender(src,el){el.innerHTML=DOMPurify.sanitize(marked.parse(src,{gfm:true,breaks:false}));const used={};
+ DT.$$("h1,h2,h3,h4,h5,h6",el).forEach(h=>{let id=h.textContent.toLowerCase().trim().replace(/[^\w\s-]/g,"").replace(/\s+/g,"-")||"section";if(used[id])id+="-"+used[id]++;else used[id]=1;h.id="h-"+id})}
+const EXPORT_CSS="body{font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1a1a1a}h1,h2{border-bottom:1px solid #ddd;padding-bottom:.3em}code{background:#f3f3f3;padding:.1em .35em;border-radius:3px;font-size:.9em}pre{background:#f6f8fa;padding:12px;overflow:auto;border-radius:4px}pre code{background:none;padding:0}blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:1em;color:#555}table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}img{max-width:100%}";
+function mdExport(src){const body=DOMPurify.sanitize(marked.parse(src,{gfm:true}));const t=(src.match(/^#\s+(.+)$/m)||[,"Document"])[1];
+ return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${DT.esc(t)}</title>\n<style>${EXPORT_CSS}</style>\n</head>\n<body>\n${body}\n</body>\n</html>\n`}
+
+const $=DT.$;let mode="doc",name="";
+function go(){const src=$("#src").value;if(!src.trim()){$("#tocWrap").hidden=true;return}
+ mdRender(src,$("#view"));$("#html").textContent=$("#view").innerHTML;
+ const hs=DT.$$("h1,h2,h3",$("#view"));$("#tocWrap").hidden=hs.length<2;
+ $("#toc").innerHTML=hs.map(h=>`<a href="#${h.id}" class="l${h.tagName[1]}">${DT.esc(h.textContent)}</a>`).join("");
+ $("#title").textContent=name||"Preview"}
+$("#src").addEventListener("input",DT.debounce(()=>{name="";go()},150));
+DT.fileDrop($("#drop"),async f=>{name=f.name;$("#src").value=await f.text();go();$("#drop").innerHTML=`<strong>${DT.esc(f.name)}</strong><span class="hint">${DT.bytes(f.size)}. Click to open a different file.</span>`});
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{mode=b.dataset.m;sm()});
+function sm(){DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===mode));$("#view").hidden=mode!=="doc";$("#html").hidden=mode!=="html"}
+$("#cp").onclick=e=>DT.copy($("#view").innerHTML,e.currentTarget);
+$("#pr").onclick=()=>window.print();
+sm();
+
+</script>
+</body>
+</html>

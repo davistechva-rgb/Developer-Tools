@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Word Counter | Developer Tools</title>
+<meta name="description" content="Words, characters, sentences, and reading time">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.nums{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.nums div{border-left:2px solid var(--line-strong);padding-left:10px}
+.nums output{display:block;font:700 2rem/1.1 var(--mono);font-stretch:87.5%;font-variant-numeric:tabular-nums}
+.nums span{color:var(--muted);font-size:.85rem}
+.lim+.lim{margin-top:12px}.lim .row{font-size:.9rem;margin-bottom:4px}
+.bar-o{height:6px;background:var(--line);border-radius:1px;overflow:hidden}.bar-o i{display:block;height:100%;background:var(--good)}
+.bar-o i.near{background:var(--warn)}.bar-o i.over{background:var(--bad)}.bad-t{color:var(--bad);font-weight:700}
+#top tr:last-child td{border-bottom:0}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel"><div class="panel-h"><label class="h" for="in">Your text</label><div class="row"><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+  <textarea id="in" spellcheck="true" placeholder="Type or paste text" style="min-height:440px"></textarea>
+  <p class="hint mt">Your text stays in this browser tab. It isn't saved or sent anywhere.</p></section>
+ <div class="stack">
+  <section class="panel"><div class="nums">
+   <div><output id="w">0</output><span>words</span></div><div><output id="c">0</output><span>characters</span></div>
+   <div><output id="sn">0</output><span>sentences</span></div><div><output id="pa">0</output><span>paragraphs</span></div></div>
+   <dl class="kv mt" id="kv"></dl></section>
+  <section class="panel"><div class="panel-h"><h2>Length limits</h2></div><div id="lims"></div></section>
+  <section class="panel"><div class="panel-h"><h2>Most used words</h2><label class="chk"><input type="checkbox" id="stop"> Skip common words</label></div><table class="t" id="top"><tbody></tbody></table></section>
+ </div>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("word-counter");
+
+const $=DT.$,s=Object.assign({stop:true},DT.get("words",{}));$("#stop").checked=s.stop;
+const STOP=new Set("a about above after again against all am an and any are as at be because been before being below between both but by can could did do does doing down during each few for from further had has have having he her here hers herself him himself his how i if in into is it its itself just me more most my myself no nor not now of off on once only or other our ours ourselves out over own same she should so some such than that the their theirs them themselves then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours yourself yourselves i'm it's don't can't i've we're they're you're".split(" "));
+const LIM=[["Text message (SMS)",160],["Meta description",160],["Page title",60],["Post on X",280],["Email subject line",60]];
+const seg=typeof Intl.Segmenter==="function"?new Intl.Segmenter(undefined,{granularity:"word"}):null;
+function tokens(t){if(seg)return[...seg.segment(t)].filter(x=>x.isWordLike).map(x=>x.segment);return t.match(/[\p{L}\p{N}][\p{L}\p{N}'’_-]*/gu)||[]}
+function mins(n,wpm){const m=n/wpm;return m<1?`${Math.max(1,Math.round(m*60))} sec`:`${Math.floor(m)} min${m%1>=.5/60?` ${Math.round((m%1)*60)} sec`:""}`}
+function run(){DT.set("words",s);const t=$("#in").value,W=tokens(t),chars=[...t].length;
+ const sent=t.split(/(?<=[.!?…]["'”)]?)\s+(?=[\p{Lu}\p{N}"'“(])|\n\s*\n/u).filter(x=>/[\p{L}\p{N}]/u.test(x)).length;
+ const paras=t.split(/\n\s*\n/).filter(x=>x.trim()).length;
+ $("#w").textContent=W.length.toLocaleString();$("#c").textContent=chars.toLocaleString();$("#sn").textContent=sent.toLocaleString();$("#pa").textContent=paras.toLocaleString();
+ const avg=W.length?W.reduce((a,w)=>a+[...w].length,0)/W.length:0,longest=W.reduce((a,w)=>w.length>a.length?w:a,"");
+ $("#kv").innerHTML=`<dt>Characters without spaces</dt><dd>${[...t.replace(/\s/g,"")].length.toLocaleString()}</dd><dt>Reading time</dt><dd>${W.length?mins(W.length,238):"–"}</dd><dt>Speaking time</dt><dd>${W.length?mins(W.length,150):"–"}</dd>
+  <dt>Average word</dt><dd>${avg?avg.toFixed(1)+" letters":"–"}</dd>${sent?`<dt>Words per sentence</dt><dd>${(W.length/sent).toFixed(1)}</dd>`:""}${longest?`<dt>Longest word</dt><dd>${DT.esc(longest)}</dd>`:""}`;
+ $("#lims").innerHTML=LIM.map(([n,max])=>{const p=Math.min(100,chars/max*100),over=chars>max;return`<div class="lim"><div class="row spread"><span>${n}</span><span class="${over?"bad-t":"hint"}">${chars.toLocaleString()} / ${max}${over?` (${(chars-max).toLocaleString()} over)`:""}</span></div><div class="bar-o"><i style="width:${p}%" class="${over?"over":p>90?"near":""}"></i></div></div>`}).join("");
+ const f=new Map();W.forEach(w=>{const k=w.toLowerCase();if(s.stop&&(STOP.has(k)||k.length<2))return;f.set(k,(f.get(k)||0)+1)});
+ const top=[...f].sort((a,b)=>b[1]-a[1]).slice(0,10);
+ $("#top tbody").innerHTML=top.length?top.map(([w,n])=>`<tr><td>${DT.esc(w)}</td><td class="code" style="text-align:right">${n}</td><td class="hint" style="text-align:right;width:1%">${(n/W.length*100).toFixed(1)}%</td></tr>`).join(""):`<tr><td class="hint">Nothing yet.</td></tr>`}
+$("#in").addEventListener("input",DT.debounce(run,80));$("#stop").onchange=e=>{s.stop=e.target.checked;run()};
+$("#clear").onclick=()=>{$("#in").value="";run();$("#in").focus()};
+run();
+
+</script>
+</body>
+</html>

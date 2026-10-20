@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GUID Generator | Developer Tools</title>
+<meta name="description" content="GUIDs in registry, braces, and code-ready formats">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+#fmts th{white-space:nowrap;color:var(--ink);width:200px}
+#fmts td.code{font-size:.86rem;word-break:break-all}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="stack">
+ <section class="panel">
+  <div class="panel-h"><h2>One GUID, every format</h2><button class="btn primary" type="button" id="new">New GUID</button></div>
+  <div style="overflow-x:auto"><table class="t" id="fmts"><tbody></tbody></table></div>
+ </section>
+ <section class="panel">
+  <div class="panel-h"><h2>Bulk</h2><div class="row"><button class="btn sm" type="button" id="bCopy">Copy all</button><button class="btn sm" type="button" id="bDl">Download</button></div></div>
+  <div class="row" style="margin-bottom:14px">
+   <label class="row" style="gap:8px"><span class="lbl" style="margin:0">How many</span><input type="number" id="n" min="1" max="1000" style="width:110px"></label>
+   <label class="row" style="gap:8px"><span class="lbl" style="margin:0">Format</span><select id="bf"></select></label>
+   <button class="btn" type="button" id="bGen">Generate</button>
+  </div>
+  <pre class="out" id="bOut" tabindex="0" aria-label="Generated GUIDs" style="min-height:160px"></pre>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("guid-generator");
+
+const $=DT.$,s=Object.assign({n:10,bf:"B"},DT.get("guid",{}));
+function raw(){const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&0x0f)|0x40;b[8]=(b[8]&0x3f)|0x80;return DT.hex(b)}
+const hy=h=>[h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join("-");
+const F=[
+ ["B","Registry / braces","h=>'{'+hy(h).toUpperCase()+'}'"],
+ ["D","Standard (hyphens)","h=>hy(h)"],
+ ["DU","Standard, uppercase","h=>hy(h).toUpperCase()"],
+ ["N","Digits only","h=>h"],
+ ["P","Parentheses","h=>'('+hy(h)+')'"],
+ ["X","C# struct initializer","h=>`{0x${h.slice(0,8)},0x${h.slice(8,12)},0x${h.slice(12,16)},{${h.slice(16).match(/../g).map(x=>'0x'+x).join(',')}}}`"],
+ ["CS","C#","h=>`new Guid(\"${hy(h)}\")`"],
+ ["VB","VB.NET","h=>`New Guid(\"${hy(h)}\")`"],
+ ["PS","PowerShell","h=>`[guid]'${hy(h)}'`"],
+ ["SQL","SQL Server","h=>`CAST('${hy(h).toUpperCase()}' AS UNIQUEIDENTIFIER)`"],
+ ["CPP","C++ DEFINE_GUID","h=>`DEFINE_GUID(MyGuid, 0x${h.slice(0,8)}, 0x${h.slice(8,12)}, 0x${h.slice(12,16)}, ${h.slice(16).match(/../g).map(x=>'0x'+x).join(', ')});`"],
+ ["URN","URN","h=>'urn:uuid:'+hy(h)"]].map(([k,n,f])=>[k,n,eval(f)]);
+function one(){const h=raw();$("#fmts tbody").innerHTML=F.map(([k,n,f],i)=>`<tr><th scope="row">${n}</th><td class="code">${DT.esc(f(h))}</td><td style="width:1%"><button class="btn sm" type="button" data-i="${i}">Copy</button></td></tr>`).join("");
+ DT.$$("[data-i]").forEach(b=>b.onclick=()=>DT.copy(F[b.dataset.i][2](h),b))}
+$("#bf").innerHTML=F.map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
+let bulk=[];
+function gen(){DT.set("guid",s);const f=F.find(x=>x[0]===s.bf)[2];const n=Math.max(1,Math.min(1000,+s.n||1));bulk=Array.from({length:n},()=>f(raw()));$("#bOut").textContent=bulk.join("\n")}
+$("#n").value=s.n;$("#bf").value=s.bf;$("#n").onchange=e=>{s.n=+e.target.value;gen()};$("#bf").onchange=e=>{s.bf=e.target.value;gen()};
+$("#bGen").onclick=gen;$("#new").onclick=one;
+$("#bCopy").onclick=e=>DT.copy(bulk.join("\n"),e.currentTarget);$("#bDl").onclick=()=>DT.download("guids.txt",bulk.join("\n")+"\n");
+one();gen();
+
+</script>
+</body>
+</html>

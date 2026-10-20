@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Number Base Converter | Developer Tools</title>
+<meta name="description" content="Binary, octal, decimal, and hex side by side">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.bases{display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center}
+.bases .lbl{margin:0;display:flex;gap:8px;align-items:center;white-space:nowrap}
+.bases select{padding:4px 24px 4px 8px}
+.bases input{font-size:1.05rem}
+.bits{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.byte{border:1px solid var(--line);background:var(--inset);border-radius:var(--r);padding:8px 10px;text-align:center}
+.bb{display:block;font:500 1rem/1.4 var(--mono);font-stretch:87.5%;letter-spacing:.06em}
+.bb i{display:inline-block;width:8px}
+.bi{display:block;color:var(--muted);font-size:.75rem;margin-top:2px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel">
+  <div class="panel-h"><h2>Convert</h2><span class="hint">Type in any box. Prefixes like 0x, 0b, and 0o and separators like _ are fine.</span></div>
+  <div class="bases">
+   <label class="lbl" for="b10">Decimal</label><input type="text" id="b10" data-b="10" inputmode="numeric" spellcheck="false" autocomplete="off">
+   <label class="lbl" for="b16">Hexadecimal</label><input type="text" id="b16" data-b="16" spellcheck="false" autocomplete="off">
+   <label class="lbl" for="b2">Binary</label><input type="text" id="b2" data-b="2" inputmode="numeric" spellcheck="false" autocomplete="off">
+   <label class="lbl" for="b8">Octal</label><input type="text" id="b8" data-b="8" inputmode="numeric" spellcheck="false" autocomplete="off">
+   <label class="lbl" for="bc">Base <select id="cb" aria-label="Custom base"></select></label><input type="text" id="bc" spellcheck="false" autocomplete="off">
+  </div>
+  <div id="err" class="mt" aria-live="polite"></div>
+ </section>
+ <section class="panel">
+  <div class="panel-h"><h2>Bits</h2>
+   <div class="seg" role="group" aria-label="Bit width"><button type="button" data-w="8">8</button><button type="button" data-w="16">16</button><button type="button" data-w="32">32</button><button type="button" data-w="64">64</button></div></div>
+  <div id="bits" class="bits" aria-live="polite"></div>
+  <dl class="kv mt" id="info"></dl>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("number-base");
+
+const $=DT.$,s=Object.assign({w:32,cb:36},DT.get("nbase",{}));
+for(let b=2;b<=36;b++)$("#cb").insertAdjacentHTML("beforeend",`<option value="${b}">${b}</option>`);$("#cb").value=s.cb;
+const DIG="0123456789abcdefghijklmnopqrstuvwxyz";
+function parse(str,base){let t=str.trim().toLowerCase().replace(/[_\s,']/g,"");let neg=false;if(t[0]==="-"){neg=true;t=t.slice(1)}else if(t[0]==="+")t=t.slice(1);
+ if(base===16)t=t.replace(/^0x/,"").replace(/h$/,"");if(base===2)t=t.replace(/^0b/,"");if(base===8)t=t.replace(/^0o/,"");
+ if(!t)throw"empty";let v=0n;const B=BigInt(base);for(const c of t){const d=DIG.indexOf(c);if(d<0||d>=base)throw c;v=v*B+BigInt(d)}return neg?-v:v}
+function show(v,base){const neg=v<0n;let a=neg?-v:v;let o=a.toString(base);if(base===16)o=o.toUpperCase();return(neg?"-":"")+o}
+let cur=null;
+function update(src){const ids=[["b10",10],["b16",16],["b2",2],["b8",8],["bc",+s.cb]];
+ const el=src||$("#b10");const base=el.id==="bc"?+s.cb:+el.dataset.b;$("#err").innerHTML="";
+ if(!el.value.trim()){cur=null;ids.forEach(([i])=>{if(i!==el.id)$("#"+i).value=""});bits();return}
+ try{cur=parse(el.value,base)}catch(c){cur=null;$("#err").innerHTML=`<p class="status bad">${c==="empty"?"Enter a number":`“${DT.esc(c)}” isn't a base-${base} digit`}<span class="sub">Base ${base} uses ${base<=10?"0–"+(base-1):"0–9 and a–"+DIG[base-1]}.</span></p>`;bits();return}
+ ids.forEach(([i,b])=>{if(i!==el.id)$("#"+i).value=show(cur,b)});bits()}
+function bits(){DT.set("nbase",s);DT.$$("[data-w]").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.w===s.w));
+ const o=$("#bits"),info=$("#info");if(cur===null){o.innerHTML='<p class="hint">Enter a number to see its bits.</p>';info.innerHTML="";return}
+ const W=BigInt(s.w),min=-(1n<<(W-1n)),umax=(1n<<W)-1n;
+ if(cur>umax||cur<min){o.innerHTML=`<p class="status warn">Doesn't fit in ${s.w} bits<span class="sub">Pick a wider size, or it needs ${cur<0n?(-cur).toString(2).length+1:cur.toString(2).length} bits.</span></p>`}
+ else{const u=cur<0n?(1n<<W)+cur:cur;const b=u.toString(2).padStart(s.w,"0");
+  o.innerHTML=b.match(/.{1,8}/g).map((by,i)=>`<div class="byte"><span class="bb">${by.slice(0,4)}<i></i>${by.slice(4)}</span><span class="bi">bits ${s.w-1-i*8}–${s.w-8-i*8}</span></div>`).join("")}
+ const len=cur<0n?null:cur.toString(2).length;
+ const inRange=cur<=umax&&cur>=min;const u=inRange?(cur<0n?(1n<<W)+cur:cur):null;
+ info.innerHTML=(len?`<dt>Bits needed</dt><dd>${len} (${Math.ceil(len/8)} byte${Math.ceil(len/8)===1?"":"s"})</dd>`:"")+
+ (inRange?`<dt>Unsigned ${s.w}-bit</dt><dd>${u.toString()}</dd><dt>Signed ${s.w}-bit</dt><dd>${(u>=(1n<<(W-1n))?u-(1n<<W):u).toString()}</dd>`:"")+
+ (cur>=32n&&cur<127n?`<dt>ASCII character</dt><dd>${DT.esc(String.fromCharCode(Number(cur)))}</dd>`:"")}
+DT.$$(".bases input").forEach(i=>i.addEventListener("input",()=>update(i)));
+$("#cb").onchange=e=>{s.cb=+e.target.value;$("#bc").value=cur===null?"":show(cur,s.cb);DT.set("nbase",s)};
+DT.$$("[data-w]").forEach(b=>b.onclick=()=>{s.w=+b.dataset.w;bits()});
+$("#b10").value="255";update($("#b10"));
+
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>URL Shortener | Developer Tools</title>
+<meta name="description" content="Short links on your own domain (needs a small server piece)">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.how p{margin:8px 0 0;max-width:80ch}.how h2{margin:0;font:700 1rem var(--ui)}
+.ln{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--line)}.ln:first-child{border-top:0}
+.ln-a{display:grid;gap:2px;min-width:0}.ln-u{word-break:break-all}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel how"><h2>How this works</h2>
+ <p>Netlify can redirect short addresses using a small text file named <span class="code">_redirects</span>. Make your links here, download the file, put it in the top folder of your site (next to <span class="code">index.html</span>), and redeploy. No server, no accounts, and the links keep working as long as the site is up.</p></section>
+<div class="cols" style="margin-top:28px">
+ <section class="panel"><div class="panel-h"><h2>New short link</h2></div>
+  <label class="lbl" for="dom">Your site address</label><input type="text" id="dom" spellcheck="false" autocomplete="off" placeholder="https://tools.davis-tech-support.com">
+  <label class="lbl mt" for="long">Long address</label><input type="text" id="long" spellcheck="false" autocomplete="off" placeholder="https://…">
+  <div class="row mt">
+   <div><label class="lbl" for="pre">Folder</label><input type="text" id="pre" spellcheck="false" style="width:100px"></div>
+   <div style="flex:1"><label class="lbl" for="slug">Short name</label><div class="row" style="gap:6px"><input type="text" id="slug" spellcheck="false" autocomplete="off" placeholder="printer-setup" style="flex:1"><button class="btn sm ghost" type="button" id="rnd">Random</button></div></div></div>
+  <label class="lbl mt" for="note">Note (optional)</label><input type="text" id="note" autocomplete="off" style="font-family:var(--ui)">
+  <div class="row mt"><label class="chk"><input type="checkbox" id="perm"> Permanent (301)</label><button class="btn primary" type="button" id="add">Add link</button></div>
+  <div id="msg" class="mt" aria-live="polite"></div>
+ </section>
+ <section class="panel"><div class="panel-h"><h2>Your links</h2><div class="row"><button class="btn sm" type="button" id="imp">Import _redirects</button></div></div>
+  <div id="links"></div></section>
+</div>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2>The _redirects file</h2><div class="row">
+ <div class="seg" role="group" aria-label="Format"><button type="button" data-f="netlify">Netlify / Cloudflare Pages</button><button type="button" data-f="apache">Apache .htaccess</button></div>
+ <button class="btn sm" type="button" id="cpf">Copy</button><button class="btn primary sm" type="button" id="dl">Download file</button></div></div>
+ <pre class="out" id="file" style="min-height:0"></pre>
+ <p class="hint mt">Your list is saved in this browser. Download the file to back it up, and import it later on another computer.</p>
+</section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("url-shortener");
+
+const $=DT.$,s=Object.assign({dom:"",pre:"go",perm:false,f:"netlify",links:[]},DT.get("short",{}));
+const ok=u=>{try{const x=new URL(u);return/^https?:$/.test(x.protocol)}catch(e){return false}};
+const clean=x=>x.trim().toLowerCase().replace(/[^a-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"");
+const A="abcdefghjkmnpqrstuvwxyz23456789";const rnd=()=>Array.from({length:6},()=>A[DT.randInt(A.length)]).join("");
+const path=l=>`/${l.pre?l.pre+"/":""}${l.slug}`;
+function short(l){return(s.dom?s.dom.replace(/\/+$/,""):"")+path(l)}
+function file(){if(!s.links.length)return"# No links yet";
+ if(s.f==="apache")return"# Add to .htaccess (needs mod_alias)\n"+s.links.map(l=>`${l.note?`# ${l.note}\n`:""}Redirect ${l.code} ${path(l)} ${l.url}`).join("\n")+"\n";
+ const w=Math.max(...s.links.map(l=>path(l).length))+2;return"# Short links made with Developer Tools\n"+s.links.map(l=>`${l.note?`# ${l.note}\n`:""}${path(l).padEnd(w)}${l.url.padEnd(0)}  ${l.code}`).join("\n")+"\n"}
+function render(){DT.set("short",s);DT.$$("[data-f]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.f===s.f));$("#file").textContent=file();
+ $("#links").innerHTML=s.links.length?s.links.map((l,i)=>`<div class="ln"><div class="ln-a"><b class="code">${DT.esc(short(l))}</b><span class="hint ln-u">${DT.esc(l.url)}</span>${l.note?`<span class="hint">${DT.esc(l.note)}</span>`:""}</div>
+  <div class="row"><span class="hint">${l.code}</span><button class="btn sm" type="button" data-c="${i}">Copy</button><button class="btn sm ghost" type="button" data-e="${i}">Edit</button><button class="btn sm ghost" type="button" data-r="${i}">Remove</button></div></div>`).join("")
+  :'<p class="hint">No links yet. Add one on the left.</p>';
+ DT.$$("[data-c]").forEach(b=>b.onclick=()=>DT.copy(short(s.links[b.dataset.c]),b));
+ DT.$$("[data-r]").forEach(b=>b.onclick=()=>{s.links.splice(+b.dataset.r,1);render()});
+ DT.$$("[data-e]").forEach(b=>b.onclick=()=>{const l=s.links.splice(+b.dataset.e,1)[0];$("#long").value=l.url;$("#pre").value=l.pre;$("#slug").value=l.slug;$("#note").value=l.note||"";$("#perm").checked=l.code===301;render();$("#slug").focus()})}
+$("#add").onclick=()=>{const m=$("#msg"),url=$("#long").value.trim(),pre=clean($("#pre").value),slug=clean($("#slug").value||rnd());
+ if(!ok(url)){m.innerHTML='<p class="status bad">Enter a full address starting with https://</p>';return}
+ if(s.links.some(l=>l.pre===pre&&l.slug===slug)){m.innerHTML=`<p class="status bad">/${pre?pre+"/":""}${slug} is already used<span class="sub">Pick a different short name.</span></p>`;return}
+ const l={url,pre,slug,note:$("#note").value.trim(),code:$("#perm").checked?301:302};s.links.unshift(l);s.pre=pre;s.perm=$("#perm").checked;
+ $("#long").value="";$("#slug").value="";$("#note").value="";m.innerHTML=`<p class="status good">Added ${DT.esc(short(l))}<span class="sub">Download the file below and redeploy to make it live.</span></p>`;render()};
+$("#rnd").onclick=()=>$("#slug").value=rnd();
+$("#dom").value=s.dom;$("#dom").oninput=e=>{s.dom=e.target.value.trim();render()};$("#pre").value=s.pre;$("#perm").checked=s.perm;
+DT.$$("[data-f]").forEach(b=>b.onclick=()=>{s.f=b.dataset.f;render()});
+$("#cpf").onclick=e=>DT.copy($("#file").textContent,e.currentTarget);
+$("#dl").onclick=()=>DT.download(s.f==="apache"?"htaccess.txt":"_redirects",file());
+const fi=document.createElement("input");fi.type="file";fi.hidden=true;document.body.appendChild(fi);$("#imp").onclick=()=>fi.click();
+fi.onchange=async()=>{const f=fi.files[0];if(!f)return;let note="",n=0;(await f.text()).split(/\r?\n/).forEach(line=>{const t=line.trim();if(t.startsWith("#")){note=t.replace(/^#\s*/,"");return}
+ const m=t.match(/^\/(?:([\w-]+)\/)?([\w-]+)\s+(https?:\/\/\S+)(?:\s+(30[12]))?/);if(m&&!s.links.some(l=>l.pre===(m[1]||"")&&l.slug===m[2])){s.links.push({pre:m[1]||"",slug:m[2],url:m[3],code:+(m[4]||301),note:note.startsWith("Short links made")?"":note});n++}note=""});
+ fi.value="";render();DT.toast(`Imported ${n} link${n===1?"":"s"}`)};
+render();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Regex Tester | Developer Tools</title>
+<meta name="description" content="Test a pattern against text and see every match and group">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.rx{display:flex;align-items:center;gap:6px;background:var(--inset);border:1px solid var(--line-strong);border-radius:var(--r);padding:0 12px}
+.rx:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
+.rx input{border:0;background:transparent;font-size:1.1rem;padding:14px 4px;box-shadow:none!important}
+.sl{font:400 1.3rem/1 var(--mono);color:var(--muted)}.fl{color:var(--accent);min-width:2ch;font-size:1.05rem}
+.hlw{position:relative;height:400px;border:1px solid var(--line);border-radius:var(--r);background:var(--inset)}
+.hlw:focus-within{border-color:var(--line-strong)}
+.hlb,.hlw textarea{position:absolute;inset:0;margin:0;padding:10px 12px;font:400 .95rem/1.7 var(--mono);font-stretch:87.5%;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;overflow-y:scroll;tab-size:4}
+.hlb{color:transparent;pointer-events:none;border:1px solid transparent}
+.hlw textarea{background:transparent;border:0;resize:none;height:100%;min-height:0;box-shadow:none!important;caret-color:var(--ink)}
+.hlb mark{color:transparent;background:color-mix(in srgb,var(--accent) 45%,transparent);border-radius:1px;box-shadow:0 0 0 1px var(--accent)}
+.hlb mark.alt{background:color-mix(in srgb,var(--j-key) 40%,transparent);box-shadow:0 0 0 1px var(--j-key)}
+.hlb mark.z{display:inline-block;width:2px;margin:0 -1px;background:var(--bad);box-shadow:none;height:1.2em;vertical-align:text-bottom}
+.res{max-height:400px;overflow:auto}
+.mt-i{border-top:1px solid var(--line);padding:10px 0}.mt-i:first-of-type{border-top:0}
+.mt-h{display:flex;gap:12px;align-items:baseline}.mv{margin-top:4px;background:var(--inset);border:1px solid var(--line);border-radius:var(--r);padding:4px 8px;word-break:break-all}
+.grp{margin-top:8px;font-size:.9rem}
+.ref summary{cursor:pointer;font-weight:700;list-style-position:inside}
+.refg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 28px;margin-top:12px}
+.refg h3{font:700 .95rem/1.3 var(--ui);margin:8px 0 4px}.refg td.code{white-space:nowrap;color:var(--accent)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="rx"><span class="sl" aria-hidden="true">/</span><label class="sr" for="pat">Pattern</label><input type="text" id="pat" spellcheck="false" autocomplete="off" placeholder="\b\d{3}-\d{3}-\d{4}\b"><span class="sl" aria-hidden="true">/</span><span class="code fl" id="flv"></span></div>
+ <div class="row mt">
+  <label class="chk" title="Find every match, not just the first"><input type="checkbox" data-f="g"> g: all matches</label>
+  <label class="chk"><input type="checkbox" data-f="i"> i: ignore case</label>
+  <label class="chk" title="^ and $ match at each line"><input type="checkbox" data-f="m"> m: multiline</label>
+  <label class="chk" title=". also matches newlines"><input type="checkbox" data-f="s"> s: dot matches newline</label>
+  <label class="chk"><input type="checkbox" data-f="u"> u: Unicode</label>
+ </div>
+ <div id="perr" class="mt" aria-live="polite"></div>
+</section>
+<div class="cols" style="margin-top:28px">
+ <section class="panel"><div class="panel-h"><label class="h" for="txt">Test text</label><span class="hint" id="cnt"></span></div>
+  <div class="hlw"><div class="hlb" id="hlb" aria-hidden="true"></div><textarea id="txt" spellcheck="false"></textarea></div></section>
+ <section class="panel"><div class="panel-h"><h2>Matches</h2>
+  <div class="seg" role="group" aria-label="Mode"><button type="button" data-m="list">List</button><button type="button" data-m="replace">Replace</button></div></div>
+  <div id="listV"><div id="res" class="res"></div></div>
+  <div id="repV" hidden><label class="lbl" for="rep">Replace with</label><input type="text" id="rep" spellcheck="false" autocomplete="off" placeholder="$1, $<name>, $&">
+   <div class="row mt spread"><span class="hint">$1 is group 1, $&amp; is the whole match, $&lt;name&gt; is a named group.</span><button class="btn sm" type="button" id="cRep">Copy result</button></div>
+   <pre class="out wrapit mt" id="repOut" style="min-height:200px"></pre></div>
+ </section>
+</div>
+<details class="panel ref" style="margin-top:28px"><summary>Quick reference</summary><div class="refg" id="refg"></div></details>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("regex-tester");
+
+const $=DT.$,ta=$("#txt"),hlb=$("#hlb");
+const s=Object.assign({pat:"\\(?(?<area>\\d{3})\\)?[-. ]?(\\d{3})[-. ]?(\\d{4})",flags:"g",txt:"Main office: 434-555-0142\nAfter hours: (434) 555 0199\nFax 434.555.0107\nExt. 12",m:"list",rep:"($<area>) $2-$3"},DT.get("regex",{}));
+$("#pat").value=s.pat;ta.value=s.txt;$("#rep").value=s.rep;DT.$$("[data-f]").forEach(c=>c.checked=s.flags.includes(c.dataset.f));
+const REF=[["Characters",[[".","Any character except newline"],["\\d \\D","Digit / not a digit"],["\\w \\W","Word character (a–z, 0–9, _) / not"],["\\s \\S","Whitespace / not"],["[abc]","Any of a, b, or c"],["[^abc]","Anything except a, b, c"],["[a-z]","Range"]]],
+ ["Anchors",[["^ $","Start / end of text (or line with m)"],["\\b","Word boundary"],["\\B","Not a word boundary"]]],
+ ["Quantifiers",[["* + ?","0 or more, 1 or more, 0 or 1"],["{3} {2,} {2,5}","Exactly, at least, between"],["*? +?","Lazy (as few as possible)"]]],
+ ["Groups",[["(abc)","Capture group"],["(?<name>abc)","Named group"],["(?:abc)","Group without capturing"],["a|b","a or b"],["\\1","Back-reference to group 1"],["(?=a) (?!a)","Followed by / not followed by"],["(?<=a) (?<!a)","Preceded by / not preceded by"]]]];
+$("#refg").innerHTML=REF.map(([h,r])=>`<div><h3>${h}</h3><table class="t"><tbody>${r.map(([a,b])=>`<tr><td class="code">${DT.esc(a)}</td><td>${b}</td></tr>`).join("")}</tbody></table></div>`).join("");
+// Run the regex in a worker so a runaway pattern can be stopped
+const WSRC=`onmessage=e=>{const {p,f,t,rep}=e.data;let re;try{re=new RegExp(p,f)}catch(err){postMessage({err:err.message});return}
+ const out=[];if(re.global||re.sticky){let m,guard=0;re.lastIndex=0;while((m=re.exec(t))!==null){out.push({i:m.index,v:m[0],g:[...m].slice(1),n:m.groups||null});if(m[0]==="")re.lastIndex+=(re.unicode&&t.codePointAt(re.lastIndex)>0xffff)?2:1;if(++guard>=5000)break}}
+ else{const m=re.exec(t);if(m)out.push({i:m.index,v:m[0],g:[...m].slice(1),n:m.groups||null})}
+ let r=null;if(rep!=null)r=t.replace(re,rep);postMessage({out,r,capped:out.length>=5000})}`;
+const wurl=URL.createObjectURL(new Blob([WSRC],{type:"text/javascript"}));let W=null,timer=null,job=0;
+function run(){const flags=DT.$$("[data-f]").filter(c=>c.checked).map(c=>c.dataset.f).join("");
+ Object.assign(s,{pat:$("#pat").value,flags,txt:ta.value,rep:$("#rep").value});DT.set("regex",s);
+ $("#flv").textContent=flags;$("#cnt").textContent=`${ta.value.length.toLocaleString()} characters`;
+ DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===s.m));$("#listV").hidden=s.m!=="list";$("#repV").hidden=s.m!=="replace";
+ if(!s.pat){$("#perr").innerHTML="";$("#res").innerHTML='<p class="hint">Type a pattern above.</p>';paint([]);$("#repOut").textContent=ta.value;return}
+ if(W)W.terminate();W=new Worker(wurl);const my=++job;clearTimeout(timer);
+ timer=setTimeout(()=>{if(my!==job)return;W.terminate();W=null;$("#perr").innerHTML='<p class="status warn">Stopped after 2 seconds<span class="sub">This pattern takes too long on this text, which usually means nested repeats like (a+)+. Simplify it.</span></p>';paint([])},2000);
+ W.onmessage=e=>{if(my!==job)return;clearTimeout(timer);const d=e.data;
+  if(d.err){$("#perr").innerHTML=`<p class="status bad">Invalid pattern<span class="sub">${DT.esc(d.err.replace(/^Invalid regular expression: /,""))}</span></p>`;$("#res").innerHTML="";paint([]);return}
+  $("#perr").innerHTML="";paint(d.out);list(d.out,d.capped);$("#repOut").textContent=d.r??""};
+ W.postMessage({p:s.pat,f:flags,t:ta.value,rep:s.m==="replace"?s.rep:null})}
+function paint(ms){const t=ta.value;let h="",p=0;ms.forEach((m,k)=>{if(m.i<p)return;h+=DT.esc(t.slice(p,m.i))+(m.v?`<mark class="${k%2?"alt":""}">${DT.esc(m.v)}</mark>`:`<mark class="z"></mark>`);p=m.i+m.v.length});
+ hlb.innerHTML=h+DT.esc(t.slice(p))+"\n ";hlb.scrollTop=ta.scrollTop}
+function list(ms,capped){const r=$("#res");if(!ms.length){r.innerHTML='<p class="status">No matches</p>';return}
+ r.innerHTML=`<p class="hint">${ms.length.toLocaleString()}${capped?"+":""} match${ms.length===1?"":"es"}${!s.flags.includes("g")&&ms.length===1?". Turn on g to find all of them.":"."}</p>`+
+ ms.slice(0,300).map((m,k)=>`<div class="mt-i"><div class="mt-h"><b>Match ${k+1}</b><span class="hint">position ${m.i}</span></div><div class="code mv">${m.v?DT.esc(m.v):'<span class="hint">(empty match)</span>'}</div>
+  ${m.g.length?`<dl class="kv grp">${m.g.map((g,j)=>{const nm=m.n?Object.keys(m.n).find(k=>m.n[k]===g&&g!==undefined):null;return`<dt>Group ${j+1}${nm?` (${DT.esc(nm)})`:""}</dt><dd>${g===undefined?'<span class="hint">not matched</span>':DT.esc(g)}</dd>`}).join("")}</dl>`:""}</div>`).join("")+(ms.length>300?'<p class="hint mt">Showing the first 300.</p>':"")}
+$("#pat").addEventListener("input",DT.debounce(run,120));ta.addEventListener("input",DT.debounce(run,120));$("#rep").addEventListener("input",DT.debounce(run,150));
+DT.$$("[data-f]").forEach(c=>c.onchange=run);DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.m=b.dataset.m;run()});
+ta.addEventListener("scroll",()=>hlb.scrollTop=ta.scrollTop);
+$("#cRep").onclick=e=>DT.copy($("#repOut").textContent,e.currentTarget);
+run();
+
+</script>
+</body>
+</html>

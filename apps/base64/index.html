@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Base64 Encoder/Decoder | Developer Tools</title>
+<meta name="description" content="Text and files to Base64 and back, including URL-safe and data URIs">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.prev{display:block;max-width:100%;max-height:220px;margin-top:10px;border:1px solid var(--line);background:repeating-conic-gradient(var(--line) 0 25%,transparent 0 50%) 0 0/16px 16px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="row" style="margin-bottom:18px"><div class="seg" role="group" aria-label="Mode"><button type="button" data-m="text">Text</button><button type="button" data-m="file">File</button></div></div>
+<div id="textMode">
+ <div class="cols">
+  <section class="panel"><div class="panel-h"><label class="h" for="plain">Text</label><div class="row"><button class="btn sm" type="button" data-copy="plain">Copy</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+   <textarea id="plain" spellcheck="false" placeholder="Type here to encode"></textarea></section>
+  <section class="panel"><div class="panel-h"><label class="h" for="enc">Base64</label><div class="row"><button class="btn sm" type="button" data-copy="enc">Copy</button></div></div>
+   <textarea id="enc" spellcheck="false" placeholder="Or paste Base64 here to decode"></textarea>
+   <div id="tErr" class="mt" aria-live="polite"></div></section>
+ </div>
+ <div class="row mt"><label class="chk"><input type="checkbox" id="urlsafe"> URL-safe (- and _ instead of + and /, no padding)</label><label class="chk"><input type="checkbox" id="wrap"> Break lines at 76 characters</label></div>
+</div>
+<div id="fileMode" hidden>
+ <div class="cols">
+  <section class="panel"><div class="panel-h"><h2>File to Base64</h2></div>
+   <div class="drop" id="drop"><strong>Drop a file here</strong><span class="hint">or click to choose one. It stays on this device.</span></div>
+   <div id="fInfo" class="mt"></div>
+   <div class="row mt spread"><div class="seg" role="group" aria-label="Output"><button type="button" data-o="raw">Base64 only</button><button type="button" data-o="uri">Data URI</button></div>
+    <div class="row"><button class="btn sm" type="button" id="fCopy" disabled>Copy</button><button class="btn sm" type="button" id="fSave" disabled>Save as .txt</button></div></div>
+   <textarea id="fOut" class="mt" readonly spellcheck="false" style="min-height:160px"></textarea></section>
+  <section class="panel"><div class="panel-h"><h2>Base64 to file</h2></div>
+   <textarea id="bIn" spellcheck="false" placeholder="Paste Base64 or a data URI" style="min-height:160px"></textarea>
+   <div id="bInfo" class="mt" aria-live="polite"></div>
+   <div class="row mt"><input type="text" id="bName" placeholder="File name" style="max-width:260px"><button class="btn primary" type="button" id="bSave" disabled>Download file</button></div></section>
+ </div>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("base64");
+
+const $=DT.$,s=Object.assign({mode:"text",urlsafe:false,wrap:false,out:"raw"},DT.get("b64",{}));
+function enc(str){let b=DT.b64(DT.utf8(str));if(s.urlsafe)b=b.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");if(s.wrap)b=b.replace(/(.{76})(?=.)/g,"$1\n");return b}
+function toBytes(b){b=b.replace(/^data:[^,]*;base64,/i,"").replace(/\s+/g,"").replace(/-/g,"+").replace(/_/g,"/");
+ if(/[^A-Za-z0-9+/=]/.test(b))throw new Error("chars");b=b.replace(/=+$/,"");if(b.length%4===1)throw new Error("len");return DT.unb64(b+"===".slice((b.length+3)%4))}
+let binBytes=null;
+function fromEnc(){const e=$("#enc").value,o=$("#tErr");binBytes=null;
+ if(!e.trim()){$("#plain").value="";o.innerHTML="";return}
+ try{const by=toBytes(e);try{$("#plain").value=new TextDecoder("utf-8",{fatal:true}).decode(by);o.innerHTML=`<p class="hint">${by.length.toLocaleString()} bytes decoded.</p>`}
+  catch(_){binBytes=by;$("#plain").value="";o.innerHTML=`<p class="status warn">This is binary data, not text<span class="sub">${by.length.toLocaleString()} bytes. <button class="btn sm" type="button" id="binSave" style="margin-top:6px">Download as file</button></span></p>`;
+   $("#binSave").onclick=()=>DT.download("decoded"+(sniff(by)||[".bin"])[0],new Blob([by]))}}
+ catch(err){o.innerHTML=`<p class="status bad">That isn't valid Base64<span class="sub">${err.message==="chars"?"It contains characters Base64 doesn't use. Only A–Z, a–z, 0–9, + / (or - _) and = are allowed.":"It's the wrong length. Part of it may be missing."}</span></p>`}}
+function fromPlain(){$("#enc").value=$("#plain").value?enc($("#plain").value):"";$("#tErr").innerHTML=""}
+$("#plain").addEventListener("input",fromPlain);$("#enc").addEventListener("input",fromEnc);
+$("#clear").onclick=()=>{$("#plain").value="";$("#enc").value="";$("#tErr").innerHTML="";$("#plain").focus()};
+DT.$$("[data-copy]").forEach(b=>b.onclick=()=>DT.copy($("#"+b.dataset.copy).value,b));
+$("#urlsafe").checked=s.urlsafe;$("#wrap").checked=s.wrap;
+$("#urlsafe").onchange=e=>{s.urlsafe=e.target.checked;save();fromPlain()};$("#wrap").onchange=e=>{s.wrap=e.target.checked;save();fromPlain()};
+function save(){DT.set("b64",s)}
+function setMode(m){s.mode=m;save();DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===m));$("#textMode").hidden=m!=="text";$("#fileMode").hidden=m!=="file"}
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+// ---- files
+const MAGIC=[[[0x89,0x50,0x4e,0x47],".png","image/png"],[[0xff,0xd8,0xff],".jpg","image/jpeg"],[[0x47,0x49,0x46,0x38],".gif","image/gif"],[[0x25,0x50,0x44,0x46],".pdf","application/pdf"],[[0x50,0x4b,0x03,0x04],".zip","application/zip"],[[0x52,0x49,0x46,0x46],".webp","image/webp"],[[0x3c,0x73,0x76,0x67],".svg","image/svg+xml"]];
+function sniff(b){const m=MAGIC.find(([sig])=>sig.every((x,i)=>b[i]===x));return m?[m[1],m[2]]:null}
+let fData=null;
+function showFile(){if(!fData)return;DT.$$("[data-o]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.o===s.out));
+ $("#fOut").value=s.out==="uri"?`data:${fData.type||"application/octet-stream"};base64,${fData.b64}`:fData.b64;
+ $("#fInfo").innerHTML=`<dl class="kv"><dt>File</dt><dd>${DT.esc(fData.name)}</dd><dt>Size</dt><dd>${DT.bytes(fData.size)} becomes ${DT.bytes($("#fOut").value.length)} as Base64</dd></dl>`;
+ $("#fCopy").disabled=$("#fSave").disabled=false}
+DT.$$("[data-o]").forEach(b=>b.onclick=()=>{s.out=b.dataset.o;save();showFile()});
+DT.fileDrop($("#drop"),async f=>{if(f.size>50e6){$("#fInfo").innerHTML=`<p class="status warn">Files over 50 MB are too big to show as text here.</p>`;return}
+ fData={name:f.name,size:f.size,type:f.type,b64:DT.b64(new Uint8Array(await f.arrayBuffer()))};showFile()});
+$("#fCopy").onclick=e=>DT.copy($("#fOut").value,e.currentTarget);
+$("#fSave").onclick=()=>DT.download((fData.name||"file")+".b64.txt",$("#fOut").value);
+let bBytes=null,bType="application/octet-stream";
+$("#bIn").addEventListener("input",()=>{const v=$("#bIn").value.trim(),o=$("#bInfo");bBytes=null;$("#bSave").disabled=true;if(!v){o.innerHTML="";return}
+ try{bBytes=toBytes(v);const du=v.match(/^data:([^;,]+)/i);const sn=sniff(bBytes);bType=du?du[1]:sn?sn[1]:"application/octet-stream";
+  if(!$("#bName").value||$("#bName").dataset.auto){$("#bName").value="decoded"+(sn?sn[0]:".bin");$("#bName").dataset.auto=1}
+  const img=/^image\//.test(bType)?`<img alt="Preview of the decoded image" src="data:${bType};base64,${DT.b64(bBytes)}" class="prev">`:"";
+  o.innerHTML=`<p class="hint">${bBytes.length.toLocaleString()} bytes, ${DT.esc(bType)}.</p>${img}`;$("#bSave").disabled=false}
+ catch(e){o.innerHTML=`<p class="status bad">That isn't valid Base64<span class="sub">Check that you copied all of it.</span></p>`}});
+$("#bName").addEventListener("input",e=>delete e.target.dataset.auto);
+$("#bSave").onclick=()=>DT.download($("#bName").value||"decoded.bin",new Blob([bBytes],{type:bType}));
+setMode(s.mode);
+
+</script>
+</body>
+</html>

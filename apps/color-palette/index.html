@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Color Palette Generator | Developer Tools</title>
+<meta name="description" content="Harmonious palettes from one starting color">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.pal{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.chip{border:0;min-height:170px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:12px;cursor:pointer;text-align:left;gap:2px}
+.chip .cn{font-weight:700;font-size:.9rem}.chip .ch{font:600 .95rem/1.2 var(--mono);font-stretch:87.5%}.chip .cc{font-size:.78rem;opacity:0;transition:.12s}
+.chip:hover .cc,.chip:focus-visible .cc{opacity:.85}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row">
+  <label class="btn" for="native">Base color</label><input type="color" id="native" class="sr">
+  <input type="text" id="base" spellcheck="false" autocomplete="off" style="max-width:200px">
+  <button class="btn" type="button" id="rand">Random base</button>
+  <div class="seg" role="group" aria-label="Palette type" id="modes" style="flex-wrap:wrap"></div>
+ </div>
+ <div class="pal mt" id="pal"></div>
+ <p class="hint mt" id="mnote"></p>
+</section>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2>Export</h2>
+ <div class="seg" role="group" aria-label="Format"><button type="button" data-x="css">CSS variables</button><button type="button" data-x="json">JSON</button><button type="button" data-x="tw">Tailwind</button><button type="button" data-x="list">Hex list</button></div></div>
+ <pre class="out" id="exp" style="min-height:0"></pre><div class="row mt"><button class="btn sm" type="button" id="cpx">Copy</button></div>
+</section>
+</main>
+<script src="../../shared/color.js"></script>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("color-palette");
+
+const $=DT.$,s=Object.assign({base:"#1F4E85",mode:"scale",x:"css"},DT.get("palette",{}));
+const M={scale:["Shade scale","11 steps from near-white to near-black, named 50 to 950 like design systems use."],mono:["Monochrome","Same hue at different lightness and saturation."],comp:["Complementary","The base and the color opposite it on the wheel. High contrast."],
+ split:["Split complementary","The base plus the two colors beside its opposite. Contrast with less tension."],ana:["Analogous","Neighbors on the wheel. Calm and cohesive."],tri:["Triadic","Three colors evenly spaced. Vivid and balanced."],tet:["Tetradic","Four colors in two complementary pairs. Rich; let one lead."]};
+$("#modes").innerHTML=Object.entries(M).map(([k,[n]])=>`<button type="button" data-m="${k}">${n}</button>`).join("");
+let cols=[];
+function build(){const c=DTC.parse(s.base)||DTC.parse("#1F4E85"),{h,s:sa,l}=DTC.hsl(c);const H=(dh,ds=0,dl=0)=>DTC.fromHsl(h+dh,Math.max(0,Math.min(100,sa+ds)),Math.max(0,Math.min(100,l+dl)));
+ switch(s.mode){
+  case"scale":{const L=[97,93,86,76,64,52,42,34,26,18,11],N=[50,100,200,300,400,500,600,700,800,900,950];return L.map((x,i)=>({n:String(N[i]),c:DTC.fromHsl(h,Math.max(12,Math.min(95,sa*(x>90||x<15?.8:1))),x)}))}
+  case"mono":return[[-30,30],[-15,18],[0,0],[10,-15],[20,-28]].map(([ds,dl],i)=>({n:["lightest","light","base","dark","darkest"][i],c:H(0,ds,dl)}));
+  case"comp":return[{n:"base",c},{n:"base light",c:H(0,0,20)},{n:"complement",c:H(180)},{n:"complement light",c:H(180,0,20)}];
+  case"split":return[{n:"base",c},{n:"split 1",c:H(150)},{n:"split 2",c:H(210)}];
+  case"ana":return[-60,-30,0,30,60].map(d=>({n:d?`${d>0?"+":""}${d}°`:"base",c:d?H(d):c}));
+  case"tri":return[0,120,240].map(d=>({n:d?`+${d}°`:"base",c:d?H(d):c}));
+  case"tet":return[0,90,180,270].map(d=>({n:d?`+${d}°`:"base",c:d?H(d):c}))}}
+function run(){DT.set("palette",s);const b=DTC.parse(s.base);$("#native").value=b?DTC.hex(b):"#1f4e85";
+ DT.$$("[data-m]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.m===s.mode));DT.$$("[data-x]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.x===s.x));
+ $("#mnote").textContent=M[s.mode][1];cols=build();
+ $("#pal").innerHTML=cols.map((o,i)=>{const hx=DTC.hex(o.c);return`<button type="button" class="chip" data-i="${i}" style="background:${hx};color:${DTC.textOn(o.c)}"><span class="cn">${o.n}</span><span class="ch">${hx.toUpperCase()}</span><span class="cc">Copy</span></button>`}).join("");
+ DT.$$("#pal [data-i]").forEach(b=>b.onclick=()=>{DT.copy(DTC.hex(cols[b.dataset.i].c).toUpperCase());b.querySelector(".cc").textContent="Copied";setTimeout(()=>b.querySelector(".cc").textContent="Copy",1000)});
+ $("#exp").textContent=exp()}
+const key=n=>String(n).replace(/°/g,"").replace(/\+/g,"plus").replace(/-/g,"minus").replace(/\s+/g,"-");
+function exp(){const hx=cols.map(o=>[key(o.n),DTC.hex(o.c)]);
+ if(s.x==="css")return":root {\n"+hx.map(([n,h])=>`  --color-${n}: ${h};`).join("\n")+"\n}";
+ if(s.x==="json")return JSON.stringify(Object.fromEntries(hx),null,2);
+ if(s.x==="tw")return"// tailwind.config.js\ntheme: {\n  extend: {\n    colors: {\n      brand: {\n"+hx.map(([n,h])=>`        '${n}': '${h}',`).join("\n")+"\n      },\n    },\n  },\n},";
+ return hx.map(([,h])=>h).join("\n")}
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.mode=b.dataset.m;run()});DT.$$("[data-x]").forEach(b=>b.onclick=()=>{s.x=b.dataset.x;run()});
+$("#base").value=s.base;$("#base").oninput=e=>{if(DTC.parse(e.target.value)){s.base=e.target.value;run()}};
+$("#native").oninput=e=>{s.base=e.target.value;$("#base").value=s.base;run()};
+$("#rand").onclick=()=>{s.base=DTC.hex(DTC.fromHsl(Math.random()*360,45+Math.random()*40,35+Math.random()*25));$("#base").value=s.base;run()};
+$("#cpx").onclick=e=>DT.copy($("#exp").textContent,e.currentTarget);
+run();
+
+</script>
+</body>
+</html>

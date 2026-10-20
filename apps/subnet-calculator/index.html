@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Subnet Calculator | Developer Tools</title>
+<meta name="description" content="Split a network into equal subnets">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.need{display:grid;grid-template-columns:1fr 110px auto auto;gap:8px;align-items:center;margin-bottom:8px;max-width:560px}
+#tbl td{white-space:nowrap}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="seg" role="group" aria-label="Mode" style="margin-bottom:18px"><button type="button" data-m="equal">Equal subnets</button><button type="button" data-m="vlsm">Plan by need (VLSM)</button></div>
+<section class="panel">
+ <div class="row"><div><label class="lbl" for="net">Network to divide</label><input type="text" id="net" spellcheck="false" autocomplete="off" style="width:220px"></div>
+  <div id="eqO" class="row" style="align-self:flex-end">
+   <select id="by" aria-label="Split by"><option value="n">Number of subnets</option><option value="h">Hosts per subnet</option><option value="p">New prefix</option></select>
+   <input type="number" id="amt" min="1" style="width:110px" aria-label="Amount"></div></div>
+ <div id="vlO" class="mt" hidden>
+  <p class="hint">List each network you need and how many devices it has to hold. Bigger ones are placed first so nothing overlaps.</p>
+  <div id="needs"></div><button class="btn sm mt" type="button" id="addN">Add a network</button></div>
+ <div id="err" class="mt" aria-live="polite"></div>
+</section>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2 id="sumH">Subnets</h2><div class="row"><button class="btn sm" type="button" id="csv">Download CSV</button><button class="btn sm" type="button" id="cp">Copy table</button></div></div>
+ <div style="overflow-x:auto"><table class="t" id="tbl"><thead></thead><tbody></tbody></table></div></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("subnet-calculator");
+
+const IP={};
+IP.p4=s=>{const m=String(s).trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);if(!m)return null;const o=m.slice(1).map(Number);if(o.some(x=>x>255)||m.slice(1).some(x=>x.length>1&&x[0]==="0"))return null;return((o[0]<<24)>>>0)+(o[1]<<16)+(o[2]<<8)+o[3]};
+IP.s4=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join(".");
+IP.mask=p=>p===0?0:(0xFFFFFFFF<<(32-p))>>>0;
+IP.pfx=m=>{let p=0;while(p<32&&(m>>>(31-p))&1)p++;return IP.mask(p)===m>>>0?p:null};
+IP.bin=n=>[24,16,8,0].map(k=>((n>>>k)&255).toString(2).padStart(8,"0")).join(".");
+IP.type4=n=>{const i=(a,b,p)=>(n&IP.mask(p))>>>0===(IP.p4(a)&IP.mask(p))>>>0;
+ if(i("10.0.0.0",0,8)||i("172.16.0.0",0,12)||i("192.168.0.0",0,16))return"Private (RFC 1918)";if(i("100.64.0.0",0,10))return"Carrier-grade NAT (RFC 6598)";if(i("127.0.0.0",0,8))return"Loopback";
+ if(i("169.254.0.0",0,16))return"Link-local (APIPA: no DHCP answer)";if(i("224.0.0.0",0,4))return"Multicast";if(i("240.0.0.0",0,4))return n===0xFFFFFFFF?"Broadcast":"Reserved";if(i("0.0.0.0",0,8))return"This network";
+ if(i("192.0.2.0",0,24)||i("198.51.100.0",0,24)||i("203.0.113.0",0,24))return"Documentation (TEST-NET)";if(i("198.18.0.0",0,15))return"Benchmarking";return"Public"};
+IP.class4=n=>{const a=n>>>24;return a<128?"A":a<192?"B":a<224?"C":a<240?"D (multicast)":"E (reserved)"};
+IP.p6=str=>{let s=String(str).trim().toLowerCase().replace(/^\[|\]$/g,"").replace(/%.*$/,"");let tail4=null;const m4=s.match(/(\d+\.\d+\.\d+\.\d+)$/);if(m4){const n=IP.p4(m4[1]);if(n===null)return null;s=s.slice(0,-m4[1].length)+((n>>>16).toString(16))+":"+((n&65535).toString(16))}
+ if(!/^[0-9a-f:]+$/.test(s)||(s.match(/::/g)||[]).length>1)return null;let parts;
+ if(s.includes("::")){const [a,b]=s.split("::");const A=a?a.split(":"):[],B=b?b.split(":"):[];if(A.length+B.length>7)return null;parts=[...A,...Array(8-A.length-B.length).fill("0"),...B]}else parts=s.split(":");
+ if(parts.length!==8||parts.some(x=>!/^[0-9a-f]{1,4}$/.test(x)))return null;return parts.reduce((v,x)=>(v<<16n)|BigInt(parseInt(x,16)),0n)};
+IP.full6=v=>Array.from({length:8},(_,i)=>((v>>BigInt(112-16*i))&0xFFFFn).toString(16).padStart(4,"0")).join(":");
+IP.s6=v=>{const g=IP.full6(v).split(":").map(x=>x.replace(/^0+(?=.)/,""));let bs=-1,bl=0;for(let i=0;i<8;){if(g[i]==="0"){let j=i;while(j<8&&g[j]==="0")j++;if(j-i>bl&&j-i>1){bs=i;bl=j-i}i=j}else i++}
+ if(bs<0)return g.join(":");return(g.slice(0,bs).join(":")+"::"+g.slice(bs+bl).join(":"))};
+IP.mask6=p=>p===0?0n:((1n<<128n)-1n)^((1n<<BigInt(128-p))-1n);
+IP.type6=v=>{const top=p=>v>>BigInt(128-p);if(v===0n)return"Unspecified";if(v===1n)return"Loopback";if(top(10)===0x3FAn)return"Link-local";if(top(7)===0x7En)return"Unique local (private)";if(top(8)===0xFFn)return"Multicast";
+ if(top(96)===0xFFFFn)return"IPv4-mapped";if(top(32)===0x20010db8n)return"Documentation";if(top(3)===1n)return"Global unicast (public)";return"Reserved"};
+IP.parse=str=>{str=String(str).trim();let [a,pf]=str.split("/");let p=pf===undefined?null:pf.trim();
+ const sp=a.trim().split(/\s+/);if(sp.length===2&&p===null){a=sp[0];p=sp[1]}
+ const v4=IP.p4(a);if(v4!==null){if(p===null||p==="")p=null;else if(/^\d+$/.test(p)){p=+p;if(p>32)throw"An IPv4 prefix goes from /0 to /32."}else{const m=IP.p4(p);if(m===null)throw"That subnet mask isn't valid.";const pp=IP.pfx(m);if(pp===null){const w=IP.pfx((~m)>>>0);throw"That mask has gaps in it. A valid mask is all 1s followed by all 0s, like 255.255.255.0."}p=pp}return{v:4,n:v4,p}}
+ const v6=IP.p6(a);if(v6!==null){if(p!==null&&p!==""){if(!/^\d+$/.test(p)||+p>128)throw"An IPv6 prefix goes from /0 to /128.";p=+p}else p=null;return{v:6,n:v6,p}}
+ throw"That isn't a valid IPv4 or IPv6 address."};
+
+const $=DT.$,s=Object.assign({m:"equal",net:"192.168.0.0/22",by:"n",amt:4,needs:[["Staff",100],["Guest Wi-Fi",200],["Cameras",40],["Printers",10],["Management",6]]},DT.get("subnet",{}));
+let rows=[],head=[];
+function blk(n,p){const m=IP.mask(p),net=(n&m)>>>0,bc=(net|(~m>>>0))>>>0,sz=2**(32-p);return{net,bc,p,m,first:p>=31?net:net+1,last:p>=31?bc:bc-1,hosts:p>=31?(p===31?2:1):sz-2,size:sz}}
+function need2p(h){for(let p=30;p>=0;p--)if(2**(32-p)-2>=h)return p;return 0}
+function run(){DT.set("subnet",s);DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===s.m));$("#eqO").hidden=s.m!=="equal";$("#vlO").hidden=s.m!=="vlsm";$("#err").innerHTML="";
+ let r;try{r=IP.parse(s.net);if(r.v!==4)throw"This planner works with IPv4. Use the IP Address Calculator for IPv6.";if(r.p===null)throw"Add a prefix, like /24."}catch(e){$("#err").innerHTML=`<p class="status bad">${DT.esc(String(e))}</p>`;fill([]);return}
+ const base=blk(r.n,r.p);if(base.net!==r.n)$("#err").innerHTML=`<p class="status warn">Using ${IP.s4(base.net)}/${r.p}<span class="sub">${IP.s4(r.n)} isn't the start of a /${r.p}, so I used the network it belongs to.</span></p>`;
+ let list=[];
+ if(s.m==="equal"){const a=Math.max(1,+s.amt||1);let np;
+  if(s.by==="n")np=r.p+Math.ceil(Math.log2(a));else if(s.by==="h")np=need2p(a);else np=a;
+  if(np>32||np<r.p){$("#err").innerHTML=`<p class="status bad">${np<r.p?`That needs a bigger network than /${r.p}.`:"That's more subnets than this network can hold."}</p>`;fill([]);return}
+  const count=2**(np-r.p);if(count>4096){$("#err").innerHTML=`<p class="status warn">That makes ${count.toLocaleString()} subnets. Showing the first 4,096.</p>`}
+  for(let i=0;i<Math.min(count,4096);i++)list.push(["Subnet "+(i+1),null,blk((base.net+i*2**(32-np))>>>0,np)]);
+  $("#sumH").textContent=`${count.toLocaleString()} subnets of /${np} (${blk(0,np).hosts.toLocaleString()} usable hosts each)`}
+ else{let cur=base.net;const end=base.bc;const sorted=s.needs.map((x,i)=>({n:x[0]||`Network ${i+1}`,h:+x[1]||1,i})).sort((a,b)=>b.h-a.h);let over=[];
+  for(const x of sorted){const p=need2p(x.h);const sz=2**(32-p);cur=Math.ceil(cur/sz)*sz;if(cur+sz-1>end){over.push(x.n);continue}list.push([x.n,x.h,blk(cur>>>0,p)]);cur+=sz}
+  const used=list.reduce((a,x)=>a+x[2].size,0);
+  $("#sumH").textContent=`${list.length} networks, using ${used.toLocaleString()} of ${base.size.toLocaleString()} addresses`;
+  if(over.length)$("#err").innerHTML=`<p class="status bad">Doesn't fit: ${DT.esc(over.join(", "))}<span class="sub">Use a larger network, like /${Math.max(0,r.p-1)}.</span></p>`}
+ fill(list)}
+function fill(list){head=s.m==="vlsm"?["Name","Needed","Network","Mask","Usable range","Broadcast","Usable hosts"]:["Name","Network","Mask","Usable range","Broadcast","Usable hosts"];
+ rows=list.map(([n,h,b])=>{const r=[n];if(s.m==="vlsm")r.push(String(h));r.push(`${IP.s4(b.net)}/${b.p}`,IP.s4(b.m),`${IP.s4(b.first)} – ${IP.s4(b.last)}`,b.p>=31?"–":IP.s4(b.bc),b.hosts.toLocaleString());return r});
+ $("#tbl thead").innerHTML=`<tr>${head.map(h=>`<th scope="col">${h}</th>`).join("")}</tr>`;
+ $("#tbl tbody").innerHTML=rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i?"code":""}">${DT.esc(c)}</td>`).join("")}</tr>`).join("")}
+function needs(){$("#needs").innerHTML=s.needs.map(([n,h],i)=>`<div class="need"><input type="text" value="${DT.attr(n)}" data-n="${i}" aria-label="Name" style="font-family:var(--ui)"><input type="number" min="1" value="${h}" data-h="${i}" aria-label="Devices"><span class="hint">devices</span><button class="btn sm ghost" type="button" data-r="${i}">Remove</button></div>`).join("");
+ DT.$$("[data-n]").forEach(e=>e.oninput=()=>{s.needs[e.dataset.n][0]=e.value;run()});DT.$$("[data-h]").forEach(e=>e.oninput=()=>{s.needs[e.dataset.h][1]=+e.value;run()});
+ DT.$$("[data-r]").forEach(e=>e.onclick=()=>{s.needs.splice(+e.dataset.r,1);needs();run()})}
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.m=b.dataset.m;run()});
+$("#net").value=s.net;$("#net").oninput=DT.debounce(()=>{s.net=$("#net").value;run()},200);
+$("#by").value=s.by;$("#by").onchange=e=>{s.by=e.target.value;s.amt={n:4,h:50,p:26}[s.by];$("#amt").value=s.amt;run()};
+$("#amt").value=s.amt;$("#amt").oninput=e=>{s.amt=+e.target.value;run()};
+$("#addN").onclick=()=>{s.needs.push(["",10]);needs();run();DT.$$("[data-n]").pop().focus()};
+const tsv=()=>[head,...rows].map(r=>r.join("\t")).join("\n");
+$("#cp").onclick=e=>DT.copy(tsv(),e.currentTarget);
+$("#csv").onclick=()=>DT.download("subnets.csv",[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n")+"\n","text/csv");
+needs();run();
+
+</script>
+</body>
+</html>

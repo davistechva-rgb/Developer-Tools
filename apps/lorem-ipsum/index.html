@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lorem Ipsum Generator | Developer Tools</title>
+<meta name="description" content="Placeholder paragraphs, sentences, or words">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.doc-out{white-space:normal;font:400 1rem/1.7 var(--ui);min-height:320px}
+.doc-out p{margin:0 0 1em;max-width:72ch}.doc-out ul{margin:0;padding-left:1.3em}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel"><div class="panel-h"><h2>Placeholder text</h2><div class="row"><button class="btn sm" type="button" id="copy">Copy</button><button class="btn primary" type="button" id="gen">Generate new</button></div></div>
+  <div class="out doc-out" id="out" tabindex="0" aria-label="Generated text"></div>
+  <p class="hint mt" id="stat"></p></section>
+ <section class="panel"><div class="panel-h"><h2>Options</h2></div>
+  <div class="seg" role="group" aria-label="Unit" style="flex-wrap:wrap"><button type="button" data-u="p">Paragraphs</button><button type="button" data-u="s">Sentences</button><button type="button" data-u="w">Words</button><button type="button" data-u="l">List items</button></div>
+  <label class="lbl mt" for="n">How many</label><input type="number" id="n" min="1" max="500" style="max-width:120px">
+  <div class="row mt"><label class="chk"><input type="checkbox" id="classic"> Start with “Lorem ipsum dolor sit amet…”</label></div>
+  <label class="lbl mt">Copy as</label>
+  <div class="seg" role="group" aria-label="Copy format"><button type="button" data-f="text">Plain text</button><button type="button" data-f="html">HTML</button><button type="button" data-f="md">Markdown</button></div>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("lorem-ipsum");
+
+const $=DT.$,s=Object.assign({u:"p",n:3,classic:true,f:"text"},DT.get("lorem",{}));
+const W="a ac accumsan adipiscing aenean aliquam aliquet amet ante arcu at auctor augue bibendum blandit commodo condimentum congue consectetur consequat convallis cras curabitur cursus dapibus diam dictum dignissim dolor donec dui duis egestas eget eleifend elementum elit enim erat eros est et etiam eu euismod facilisis fames faucibus felis fermentum feugiat fringilla fusce gravida habitant hendrerit iaculis id imperdiet in integer interdum ipsum justo lacinia lacus laoreet lectus leo libero ligula lobortis lorem luctus maecenas magna malesuada massa mattis mauris metus mi molestie mollis morbi nam nec neque netus nibh nisi nisl non nulla nullam nunc odio orci ornare pellentesque pharetra phasellus placerat porta porttitor posuere praesent pretium proin pulvinar purus quam quis quisque rhoncus risus rutrum sagittis sapien scelerisque sed sem semper senectus sit sodales sollicitudin suscipit suspendisse tellus tempor tempus tincidunt tortor tristique turpis ullamcorper ultrices ultricies urna ut varius vehicula vel velit venenatis vestibulum vitae vivamus viverra volutpat vulputate".split(" ");
+const CL="Lorem ipsum dolor sit amet, consectetur adipiscing elit";
+const r=n=>Math.floor(Math.random()*n),pick=()=>W[r(W.length)],cap=x=>x[0].toUpperCase()+x.slice(1);
+function sentence(first){if(first&&s.classic)return CL+(Math.random()<.5?", "+Array.from({length:3+r(6)},pick).join(" "):"")+".";
+ const n=6+r(10),w=Array.from({length:n},pick);if(n>9&&Math.random()<.6)w[3+r(n-6)]+=",";return cap(w.join(" "))+(Math.random()<.08?"?":".")}
+function para(first){return Array.from({length:4+r(4)},(_,i)=>sentence(first&&i===0)).join(" ")}
+let items=[];
+function gen(){DT.set("lorem",s);DT.$$("[data-u]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.u===s.u));
+ const n=Math.max(1,Math.min(500,+s.n||1));
+ if(s.u==="p")items=Array.from({length:n},(_,i)=>para(i===0));
+ else if(s.u==="s")items=[Array.from({length:n},(_,i)=>sentence(i===0)).join(" ")];
+ else if(s.u==="w"){const base=s.classic?"lorem ipsum dolor sit amet".split(" "):[];const w=base.slice(0,n);while(w.length<n)w.push(pick());items=[cap(w.join(" "))+"."]}
+ else items=Array.from({length:n},(_,i)=>i===0&&s.classic?"Lorem ipsum dolor sit amet":cap(Array.from({length:2+r(5)},pick).join(" ")));
+ $("#out").innerHTML=s.u==="l"?`<ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul>`:items.map(x=>`<p>${x}</p>`).join("");
+ const txt=items.join(" ");$("#stat").textContent=`${txt.split(/\s+/).length.toLocaleString()} words, ${txt.length.toLocaleString()} characters.`;fmt()}
+function text(){if(s.f==="html")return s.u==="l"?`<ul>\n${items.map(x=>`  <li>${x}</li>`).join("\n")}\n</ul>`:items.map(x=>`<p>${x}</p>`).join("\n");
+ if(s.u==="l")return items.map(x=>(s.f==="md"?"- ":"")+x).join("\n");return items.join("\n\n")}
+function fmt(){DT.set("lorem",s);DT.$$("[data-f]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.f===s.f))}
+DT.$$("[data-u]").forEach(b=>b.onclick=()=>{s.u=b.dataset.u;s.n={p:3,s:5,w:50,l:5}[s.u];$("#n").value=s.n;gen()});
+DT.$$("[data-f]").forEach(b=>b.onclick=()=>{s.f=b.dataset.f;fmt()});
+$("#n").value=s.n;$("#n").onchange=e=>{s.n=+e.target.value;gen()};
+$("#classic").checked=s.classic;$("#classic").onchange=e=>{s.classic=e.target.checked;gen()};
+$("#gen").onclick=gen;$("#copy").onclick=e=>DT.copy(text(),e.currentTarget);
+gen();
+
+</script>
+</body>
+</html>

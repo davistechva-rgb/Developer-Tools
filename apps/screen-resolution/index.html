@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Screen Resolution Tester | Developer Tools</title>
+<meta name="description" content="Your screen, window, and pixel ratio at a glance">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.hero-s{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.big-r #res{display:block;font:700 clamp(2.4rem,7vw,4.4rem)/1 var(--mono);font-stretch:100%;letter-spacing:-.03em}
+.big-r .hint{display:block;margin-top:8px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel hero-s"><div class="big-r"><span id="res"></span><span class="hint" id="resL">Screen resolution</span></div>
+ <div class="row"><button class="btn primary" type="button" id="cp">Copy details for a support ticket</button></div></section>
+<div class="cols" style="margin-top:28px">
+ <section class="panel"><div class="panel-h"><h2>Display</h2></div><dl class="kv" id="d1"></dl></section>
+ <section class="panel"><div class="panel-h"><h2>This browser window</h2><span class="hint">Updates as you resize</span></div><dl class="kv" id="d2"></dl></section>
+ <section class="panel"><div class="panel-h"><h2>Settings and input</h2></div><dl class="kv" id="d3"></dl></section>
+ <section class="panel"><div class="panel-h"><h2>Browser and system</h2></div><dl class="kv" id="d4"></dl></section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("screen-resolution");
+
+const $=DT.$;let hz="Measuring…";
+function mq(q){return matchMedia(q).matches}
+function bp(w){return w<480?"Phone":w<768?"Large phone":w<1024?"Tablet":w<1440?"Laptop":w<1920?"Desktop":"Large desktop"}
+function ua(){const u=navigator.userAgent;const b=/Edg\/([\d.]+)/.exec(u)?"Edge "+RegExp.$1.split(".")[0]:/OPR\/([\d.]+)/.exec(u)?"Opera "+RegExp.$1.split(".")[0]:/Chrome\/([\d.]+)/.exec(u)?"Chrome "+RegExp.$1.split(".")[0]:/Firefox\/([\d.]+)/.exec(u)?"Firefox "+RegExp.$1.split(".")[0]:/Version\/([\d.]+).*Safari/.exec(u)?"Safari "+RegExp.$1:"Unknown";
+ const o=/CrOS/.test(u)?"ChromeOS":/Windows NT 10/.test(u)?"Windows 10 or 11":/Windows/.test(u)?"Windows":/Android ([\d.]+)/.test(u)?"Android "+RegExp.$1:/iPhone|iPad/.test(u)?"iOS or iPadOS":/Mac OS X/.test(u)?"macOS":/Linux/.test(u)?"Linux":"Unknown";return[b,o]}
+let data=[];
+function kv(el,rows){el.innerHTML=rows.map(([k,v])=>`<dt>${k}</dt><dd>${DT.esc(v)}</dd>`).join("")}
+function run(){const dpr=devicePixelRatio,sw=screen.width,sh=screen.height;
+ $("#res").textContent=`${sw} × ${sh}`;$("#resL").textContent=dpr!==1?`Screen size in CSS pixels. Physical pixels: ${Math.round(sw*dpr)} × ${Math.round(sh*dpr)} at ${Math.round(dpr*100)}% scaling.`:"Screen resolution";
+ const [b,o]=ua();
+ const d1=[["Screen (CSS pixels)",`${sw} × ${sh}`],["Physical pixels",`${Math.round(sw*dpr)} × ${Math.round(sh*dpr)}`],["Pixel ratio",`${dpr} (${Math.round(dpr*100)}% scaling)`],["Available area",`${screen.availWidth} × ${screen.availHeight}`],["Color depth",`${screen.colorDepth}-bit`],["Refresh rate",hz],["Orientation",screen.orientation?screen.orientation.type.replace("-"," "):(sw>sh?"landscape":"portrait")],["HDR capable",mq("(dynamic-range: high)")?"Yes":"No"],["Wide color (P3)",mq("(color-gamut: p3)")?"Yes":"No"]];
+ const d2=[["Viewport",`${innerWidth} × ${innerHeight}`],["Window size",`${outerWidth} × ${outerHeight}`],["Layout size",bp(innerWidth)],["Browser zoom",Math.abs(outerWidth/innerWidth-1)<.05||dpr===1?"About 100%":"Possibly zoomed (compare the viewport to the window)"]];
+ const d3=[["Color scheme",mq("(prefers-color-scheme: dark)")?"Dark":"Light"],["Reduce motion",mq("(prefers-reduced-motion: reduce)")?"On":"Off"],["More contrast",mq("(prefers-contrast: more)")?"On":"Off"],["Touch screen",navigator.maxTouchPoints>0?`Yes (${navigator.maxTouchPoints} touch points)`:"No"],["Main pointer",mq("(pointer: coarse)")?"Touch":mq("(pointer: fine)")?"Mouse or trackpad":"None"],["Hover",mq("(hover: hover)")?"Yes":"No"]];
+ const d4=[["Browser",b],["Operating system",o],["Language",navigator.language],["Time zone",Intl.DateTimeFormat().resolvedOptions().timeZone],["CPU threads",navigator.hardwareConcurrency?String(navigator.hardwareConcurrency):"Not reported"],["Memory",navigator.deviceMemory?`${navigator.deviceMemory} GB or more`:"Not reported"],["Online",navigator.onLine?"Yes":"No"],["Cookies",navigator.cookieEnabled?"Enabled":"Disabled"]];
+ kv($("#d1"),d1);kv($("#d2"),d2);kv($("#d3"),d3);kv($("#d4"),d4);data=[["Display",d1],["Window",d2],["Settings",d3],["System",d4]]}
+addEventListener("resize",DT.debounce(run,100));matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener?.("change",run);
+$("#cp").onclick=e=>DT.copy(`Display details (${new Date().toLocaleString()})\n`+data.map(([h,r])=>`\n${h}\n`+r.map(([k,v])=>`  ${k}: ${v}`).join("\n")).join("\n")+`\n\nUser agent: ${navigator.userAgent}\n`,e.currentTarget);
+(function(){let n=0,t0=0;function f(t){if(!t0)t0=t;n++;if(t-t0<1000)requestAnimationFrame(f);else{const v=n/((t-t0)/1000);const common=[30,50,60,75,90,100,120,144,165,240];hz="About "+common.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a)+" Hz";run()}}requestAnimationFrame(f)})();
+run();
+
+</script>
+</body>
+</html>

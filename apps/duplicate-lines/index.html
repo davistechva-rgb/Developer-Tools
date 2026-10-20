@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Duplicate Line Remover | Developer Tools</title>
+<meta name="description" content="Remove repeated lines, with sort and trim options">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style></style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols">
+ <section class="panel"><div class="panel-h"><label class="h" for="in">Input</label><div class="row"><button class="btn sm ghost" type="button" id="open">Open file</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+  <textarea id="in" class="nowrap" spellcheck="false" placeholder="One item per line: email lists, hostnames, MAC addresses, log lines…" style="min-height:360px"></textarea></section>
+ <section class="panel"><div class="panel-h"><h2>Result</h2><div class="row"><button class="btn sm" type="button" id="copy">Copy</button><button class="btn sm" type="button" id="dl">Download</button><button class="btn sm ghost" type="button" id="use">Use as input</button></div></div>
+  <textarea id="out" class="nowrap" readonly spellcheck="false" style="min-height:360px" aria-label="Result"></textarea>
+  <p class="status mt" id="stat" aria-live="polite">Paste lines on the left.</p></section>
+</div>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2>Options</h2></div>
+ <div class="row">
+  <div class="seg" role="group" aria-label="Show"><button type="button" data-m="unique">Remove duplicates</button><button type="button" data-m="dupes">Show only duplicates</button><button type="button" data-m="count">Count each line</button></div>
+ </div>
+ <div class="row mt">
+  <label class="chk"><input type="checkbox" id="ci"> Ignore capitalization</label>
+  <label class="chk"><input type="checkbox" id="trim"> Ignore leading and trailing spaces</label>
+  <label class="chk"><input type="checkbox" id="blank"> Remove blank lines</label>
+  <label class="chk"><input type="checkbox" id="last"> Keep the last copy instead of the first</label>
+ </div>
+ <div class="row mt"><label class="row" style="gap:8px"><span class="lbl" style="margin:0">Sort</span><select id="sort"><option value="none">Keep original order</option><option value="az">A to Z</option><option value="za">Z to A</option><option value="nat">Natural (file2 before file10)</option><option value="len">Shortest first</option><option value="freq">Most repeated first</option></select></label></div>
+</section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("duplicate-lines");
+
+const $=DT.$,s=Object.assign({m:"unique",ci:false,trim:true,blank:true,last:false,sort:"none"},DT.get("dedupe",{}));
+const coll=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
+function run(){DT.set("dedupe",s);DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===s.m));
+ const raw=$("#in").value;if(!raw){$("#out").value="";$("#stat").className="status mt";$("#stat").textContent="Paste lines on the left.";return}
+ let L=raw.replace(/\r\n?/g,"\n").split("\n");if(L.length&&L[L.length-1]==="")L.pop();
+ const total=L.length;if(s.trim)L=L.map(x=>x.trim());if(s.blank)L=L.filter(x=>x.trim());
+ const key=x=>{let k=s.trim?x.trim():x;return s.ci?k.toLowerCase():k};
+ const map=new Map();L.forEach((x,i)=>{const k=key(x);const e=map.get(k);if(e){e.n++;if(s.last){e.v=x;e.i=i}}else map.set(k,{v:x,n:1,i})});
+ let rows=[...map.values()];if(s.last)rows.sort((a,b)=>a.i-b.i);
+ if(s.m==="dupes")rows=rows.filter(r=>r.n>1);
+ const so={az:(a,b)=>coll.compare(a.v,b.v)||a.v.localeCompare(b.v),za:(a,b)=>coll.compare(b.v,a.v),nat:(a,b)=>coll.compare(a.v,b.v),len:(a,b)=>a.v.length-b.v.length||coll.compare(a.v,b.v),freq:(a,b)=>b.n-a.n||coll.compare(a.v,b.v)}[s.sort];
+ if(so)rows.sort(so);
+ $("#out").value=rows.map(r=>s.m==="count"?`${r.n}\t${r.v}`:r.v).join("\n");
+ const dupLines=L.length-map.size,dupKeys=[...map.values()].filter(r=>r.n>1).length;
+ $("#stat").className="status mt "+(dupLines?"good":"");
+ $("#stat").innerHTML=dupLines?`Removed ${dupLines.toLocaleString()} duplicate line${dupLines===1?"":"s"}<span class="sub">${total.toLocaleString()} lines in, ${map.size.toLocaleString()} unique. ${dupKeys.toLocaleString()} line${dupKeys===1?" was":"s were"} repeated.</span>`
+  :`No duplicates found<span class="sub">${total.toLocaleString()} lines, all unique${total!==L.length?` after removing ${total-L.length} blank`:""}.</span>`}
+[["ci","checked"],["trim","checked"],["blank","checked"],["last","checked"],["sort","value"]].forEach(([id,p])=>{$("#"+id)[p]=s[id];$("#"+id).onchange=e=>{s[id]=e.target[p];run()}});
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.m=b.dataset.m;run()});
+$("#in").addEventListener("input",DT.debounce(run,150));
+$("#copy").onclick=e=>DT.copy($("#out").value,e.currentTarget);$("#dl").onclick=()=>DT.download("lines.txt",$("#out").value+"\n");
+$("#use").onclick=()=>{$("#in").value=$("#out").value;run()};$("#clear").onclick=()=>{$("#in").value="";run();$("#in").focus()};
+const fi=document.createElement("input");fi.type="file";fi.accept=".txt,.csv,.log,text/*";fi.hidden=true;document.body.appendChild(fi);
+$("#open").onclick=()=>fi.click();fi.onchange=async()=>{if(fi.files[0]){$("#in").value=await fi.files[0].text();run()}fi.value=""};
+run();
+
+</script>
+</body>
+</html>

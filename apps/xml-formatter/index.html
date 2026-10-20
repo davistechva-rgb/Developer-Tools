@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>XML Formatter | Developer Tools</title>
+<meta name="description" content="Indent, minify, and check XML">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.out.stale{opacity:.35}.snip{margin-top:10px;color:var(--bad)}
+.x-com{color:var(--muted);font-style:italic}.x-at{color:var(--j-num)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="row spread" style="margin-bottom:18px">
+ <div class="row">
+  <label class="row" style="gap:8px"><span class="lbl" style="margin:0">Indent</span><select id="ind"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="tab">Tab</option></select></label>
+  <label class="chk"><input type="checkbox" id="attrs"> One attribute per line</label>
+  <label class="chk"><input type="checkbox" id="nocom"> Remove comments</label>
+ </div>
+ <div class="row"><button class="btn primary" type="button" id="fmt">Format</button><button class="btn" type="button" id="min">Minify</button></div>
+</div>
+<div class="cols">
+ <section class="panel"><div class="panel-h"><label class="h" for="in">Input</label><div class="row"><button class="btn sm ghost" type="button" id="sample">Load example</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+  <textarea id="in" class="nowrap" spellcheck="false" placeholder="Paste XML here" style="min-height:420px"></textarea></section>
+ <section class="panel"><div class="panel-h"><h2>Output</h2><div class="row"><button class="btn sm" type="button" id="copy" disabled>Copy</button><button class="btn sm" type="button" id="dl" disabled>Download</button></div></div>
+  <pre class="out" id="out" tabindex="0" aria-label="Formatted XML" style="min-height:420px"></pre>
+  <div id="msg" class="mt" aria-live="polite"></div></section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("xml-formatter");
+
+const $=DT.$,s=Object.assign({ind:"2",attrs:false,nocom:false,last:"fmt"},DT.get("xmlfmt",{}));const SAMPLE="<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><!-- main pages --><url><loc>https://davis-tech-support.com/</loc><priority>1.0</priority></url><url><loc>https://davis-tech-support.com/services</loc><changefreq>monthly</changefreq></url><url><loc>https://davis-tech-support.com/contact?ref=site&amp;src=map</loc></url></urlset>";let result="";
+$("#ind").value=s.ind;$("#attrs").checked=s.attrs;$("#nocom").checked=s.nocom;
+const ex=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),ea=t=>ex(t).replace(/"/g,"&quot;");
+function ser(doc,pretty){const I=s.ind==="tab"?"\t":" ".repeat(+s.ind),NL=pretty?"\n":"";const out=[];
+ function attrs(el,pad){const a=[...el.attributes].map(x=>`${x.name}="${ea(x.value)}"`);if(!a.length)return"";
+  return pretty&&s.attrs&&a.length>1?"\n"+a.map(x=>pad+I+x).join("\n"):" "+a.join(" ")}
+ function kids(n){return[...n.childNodes].filter(c=>!(c.nodeType===3&&!c.nodeValue.trim())&&!(c.nodeType===8&&s.nocom))}
+ function walk(n,d){const pad=pretty?I.repeat(d):"";
+  switch(n.nodeType){
+   case 1:{const k=kids(n),open=`<${n.nodeName}${attrs(n,pad)}`;
+    if(!k.length){out.push(pad+open+"/>");break}
+    if(k.every(c=>c.nodeType===3||c.nodeType===4)){out.push(pad+open+">"+k.map(c=>c.nodeType===4?`<![CDATA[${c.nodeValue}]]>`:ex(pretty?c.nodeValue.trim():c.nodeValue)).join("")+`</${n.nodeName}>`);break}
+    out.push(pad+open+">");k.forEach(c=>walk(c,d+1));out.push(pad+`</${n.nodeName}>`);break}
+   case 3:out.push(pad+ex(pretty?n.nodeValue.trim():n.nodeValue));break;
+   case 4:out.push(pad+`<![CDATA[${n.nodeValue}]]>`);break;
+   case 7:out.push(pad+`<?${n.target} ${n.data}?>`);break;
+   case 8:out.push(pad+`<!--${n.nodeValue}-->`);break;
+   case 10:out.push(`<!DOCTYPE ${n.name}${n.publicId?` PUBLIC "${n.publicId}"`:""}${n.systemId?`${n.publicId?"":" SYSTEM"} "${n.systemId}"`:""}>`);break}}
+ kids(doc).forEach(c=>walk(c,0));return out.join(NL)}
+function hl(x){return DT.esc(x).replace(/(&lt;!--[\s\S]*?--&gt;)|(&lt;\/?)([\w:.-]+)((?:\s+[\w:.-]+="[^"]*")*)(\s*\/?&gt;)|(&lt;\?[\s\S]*?\?&gt;)/g,(m,com,lt,name,at,gt,pi)=>{
+ if(com)return`<span class="x-com">${com}</span>`;if(pi)return`<span class="x-com">${pi}</span>`;
+ return`${lt}<span class="j-key">${name}</span>${at.replace(/([\w:.-]+)(=)("[^"]*")/g,'<span class="x-at">$1</span>$2<span class="j-str">$3</span>')}${gt}`})}
+function run(kind){if(kind)s.last=kind;DT.set("xmlfmt",s);const t=$("#in").value,o=$("#out"),m=$("#msg");
+ if(!t.trim()){o.innerHTML="";m.innerHTML="";result="";$("#copy").disabled=$("#dl").disabled=true;return}
+ const doc=new DOMParser().parseFromString(t,"application/xml");const pe=doc.getElementsByTagName("parsererror")[0];
+ if(pe){o.classList.add("stale");const txt=pe.textContent;const lc=txt.match(/line (\d+) at column (\d+)/)||txt.match(/Line Number (\d+), Column (\d+)/);
+  const reason=(txt.match(/error on line \d+ at column \d+:\s*([^\n]+)/)||txt.match(/XML Parsing Error:\s*([^\n]+)/)||[,txt.split("\n")[0]])[1];
+  let snip="";if(lc){const L=t.split("\n")[lc[1]-1]||"";const c=+lc[2];const st=Math.max(0,c-60);snip=`<pre class="out snip" style="min-height:0">${DT.esc(L.slice(st,c+40))}\n${" ".repeat(Math.max(0,c-1-st))}^</pre>`}
+  m.innerHTML=`<p class="status bad">Not valid XML${lc?` at line ${lc[1]}, column ${lc[2]}`:""}<span class="sub">${DT.esc(reason.trim())}</span></p>${snip}`;$("#copy").disabled=$("#dl").disabled=true;return}
+ const decl=(t.match(/^\s*(<\?xml[^?]*\?>)/)||[])[1];
+ result=(decl?decl+(s.last==="min"?"":"\n"):"")+ser(doc,s.last!=="min");
+ o.classList.remove("stale");o.innerHTML=hl(result);
+ const els=doc.getElementsByTagName("*").length;
+ m.innerHTML=`<p class="status good">Well-formed XML<span class="sub">Root element &lt;${DT.esc(doc.documentElement.nodeName)}&gt;, ${els.toLocaleString()} element${els===1?"":"s"}, ${DT.bytes(new Blob([result]).size)}.</span></p>`;$("#copy").disabled=$("#dl").disabled=false}
+$("#in").addEventListener("input",DT.debounce(()=>run(),250));
+$("#fmt").onclick=()=>run("fmt");$("#min").onclick=()=>run("min");
+$("#ind").onchange=e=>{s.ind=e.target.value;run("fmt")};$("#attrs").onchange=e=>{s.attrs=e.target.checked;run("fmt")};$("#nocom").onchange=e=>{s.nocom=e.target.checked;run()};
+$("#copy").onclick=e=>DT.copy(result,e.currentTarget);$("#dl").onclick=()=>DT.download(s.last==="min"?"data.min.xml":"data.xml",result,"application/xml");
+$("#sample").onclick=()=>{$("#in").value=SAMPLE;run("fmt")};$("#clear").onclick=()=>{$("#in").value="";run();$("#in").focus()};
+run();
+
+</script>
+</body>
+</html>

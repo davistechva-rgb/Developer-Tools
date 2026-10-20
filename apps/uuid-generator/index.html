@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UUID Generator | Developer Tools</title>
+<meta name="description" content="Version 4 and version 7 UUIDs, one at a time or in bulk">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style></style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel">
+  <div class="panel-h"><h2>Generate</h2><div class="row"><button class="btn sm" type="button" id="copy">Copy all</button><button class="btn sm" type="button" id="dl">Download</button><button class="btn primary" type="button" id="gen">Generate new</button></div></div>
+  <div class="row" style="margin-bottom:14px">
+   <div class="seg" role="group" aria-label="Version"><button type="button" data-v="4">Version 4 (random)</button><button type="button" data-v="7">Version 7 (time-ordered)</button></div>
+  </div>
+  <div class="row" style="margin-bottom:14px">
+   <label class="row" style="gap:8px"><span class="lbl" style="margin:0">How many</span><input type="number" id="n" min="1" max="1000" style="width:110px"></label>
+   <label class="chk"><input type="checkbox" id="up"> Uppercase</label>
+   <label class="chk"><input type="checkbox" id="nh"> No hyphens</label>
+  </div>
+  <pre class="out" id="out" tabindex="0" aria-label="Generated UUIDs" style="min-height:260px"></pre>
+  <p class="hint mt" id="vh"></p>
+ </section>
+ <section class="panel">
+  <div class="panel-h"><label class="h" for="ins">Inspect a UUID</label></div>
+  <input type="text" id="ins" spellcheck="false" autocomplete="off" placeholder="Paste any UUID or GUID">
+  <div id="insRes" class="mt" aria-live="polite"><p class="hint">Shows the version, variant, and for version 1 and 7, when it was created.</p></div>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("uuid-generator");
+
+const $=DT.$,s=Object.assign({v:"4",n:5,up:false,nh:false},DT.get("uuid",{}));
+function fmt(b){const h=DT.hex(b);return[h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join("-")}
+function v4(){const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&0x0f)|0x40;b[8]=(b[8]&0x3f)|0x80;return fmt(b)}
+let lastMs=-1,seq=0;
+function v7(){const b=crypto.getRandomValues(new Uint8Array(16));let ms=Date.now();
+ if(ms<=lastMs){ms=lastMs;seq++;if(seq>0xfff){ms=++lastMs;seq=0}}else{lastMs=ms;seq=b[7]&0x3ff}
+ for(let i=5;i>=0;i--){b[i]=ms%256;ms=Math.floor(ms/256)}
+ b[6]=0x70|((seq>>8)&0x0f);b[7]=seq&0xff;b[8]=(b[8]&0x3f)|0x80;return fmt(b)}
+let list=[];
+function gen(){DT.set("uuid",s);DT.$$("[data-v]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===s.v));
+ const n=Math.max(1,Math.min(1000,+s.n||1));list=[];for(let i=0;i<n;i++){let u=s.v==="7"?v7():v4();if(s.nh)u=u.replace(/-/g,"");if(s.up)u=u.toUpperCase();list.push(u)}
+ $("#out").textContent=list.join("\n");
+ $("#vh").textContent=s.v==="7"?"Version 7 starts with a timestamp, so these sort in creation order. Good for database keys.":"Version 4 is 122 random bits. The standard choice when order doesn't matter."}
+DT.$$("[data-v]").forEach(b=>b.onclick=()=>{s.v=b.dataset.v;gen()});
+$("#n").value=s.n;$("#n").onchange=e=>{s.n=+e.target.value;gen()};
+$("#up").checked=s.up;$("#up").onchange=e=>{s.up=e.target.checked;gen()};
+$("#nh").checked=s.nh;$("#nh").onchange=e=>{s.nh=e.target.checked;gen()};
+$("#gen").onclick=gen;$("#copy").onclick=e=>DT.copy(list.join("\n"),e.currentTarget);
+$("#dl").onclick=()=>DT.download("uuids.txt",list.join("\n")+"\n");
+function inspect(){const raw=$("#ins").value.trim(),o=$("#insRes");if(!raw){o.innerHTML='<p class="hint">Shows the version, variant, and for version 1 and 7, when it was created.</p>';return}
+ const h=raw.replace(/^urn:uuid:/i,"").replace(/[{}()\-\s]/g,"").toLowerCase();
+ if(!/^[0-9a-f]{32}$/.test(h)){o.innerHTML='<p class="status bad">Not a UUID<span class="sub">A UUID has 32 hex digits, usually grouped 8-4-4-4-12.</span></p>';return}
+ const ver=parseInt(h[12],16),vb=parseInt(h[16],16);
+ const variant=vb<8?"NCS (reserved, very old)":vb<12?"RFC 9562 (standard)":vb<14?"Microsoft (legacy GUID)":"Reserved";
+ let when="";
+ if(h==="0".repeat(32))return o.innerHTML='<p class="status good">Nil UUID<span class="sub">All zeros. Used as a "none" placeholder.</span></p>';
+ if(ver===7&&vb>=8&&vb<12){when=new Date(parseInt(h.slice(0,12),16))}
+ if(ver===1&&vb>=8&&vb<12){const t=BigInt("0x"+h.slice(13,16)+h.slice(8,12)+h.slice(0,8));when=new Date(Number((t-122192928000000000n)/10000n))}
+ const names={1:"Version 1 (time and MAC address)",2:"Version 2 (DCE security)",3:"Version 3 (MD5 name hash)",4:"Version 4 (random)",5:"Version 5 (SHA-1 name hash)",6:"Version 6 (reordered time)",7:"Version 7 (Unix time and random)",8:"Version 8 (custom)"};
+ const std=fmt(h.match(/../g).map(x=>parseInt(x,16)));
+ o.innerHTML=`<p class="status ${names[ver]&&vb>=8&&vb<12?"good":"warn"}">${names[ver]||"Unknown version "+ver}<span class="sub">Variant: ${variant}</span></p>
+ <dl class="kv mt"><dt>Standard form</dt><dd>${std}</dd>${when&&!isNaN(when)?`<dt>Created</dt><dd>${when.toLocaleString()} (${when.toISOString()})</dd>`:""}${ver===1?`<dt>Node</dt><dd>${h.slice(20).match(/../g).join(":")}</dd>`:""}</dl>`}
+$("#ins").addEventListener("input",inspect);
+gen();
+
+</script>
+</body>
+</html>

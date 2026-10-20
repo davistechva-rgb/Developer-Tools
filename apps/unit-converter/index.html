@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Unit Converter | Developer Tools</title>
+<meta name="description" content="Length, weight, temperature, volume, and more">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.cats{flex-wrap:wrap}
+.conv{display:grid;grid-template-columns:1fr 1.2fr auto 1.2fr;gap:14px;align-items:end}
+.conv input{font-size:1.2rem}.conv select{width:100%;min-height:46px}
+.swap{min-height:46px}
+.result{font-size:1.4rem;margin:22px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.result strong{font-size:1.8rem;color:var(--accent)}
+#all th{font-weight:400;color:var(--ink)}#all tr.hl>*{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+@media (max-width:760px){.conv{grid-template-columns:1fr 1fr}.swap{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="seg cats" role="group" aria-label="Category" id="cats"></div>
+ <div class="conv mt">
+  <div><label class="lbl" for="v">Value</label><input type="text" id="v" inputmode="decimal" autocomplete="off"></div>
+  <div><label class="lbl" for="from">From</label><select id="from"></select></div>
+  <button class="btn swap" type="button" id="swap" aria-label="Swap units">Swap</button>
+  <div><label class="lbl" for="to">To</label><select id="to"></select></div>
+ </div>
+ <p class="result" id="res" aria-live="polite"></p>
+</section>
+<section class="panel" style="margin-top:28px"><div class="panel-h"><h2 id="allH">Every unit</h2></div><div style="overflow-x:auto"><table class="t" id="all"><tbody></tbody></table></div></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("unit-converter");
+
+const $=DT.$;
+const U={
+ Length:{m:["Meters",1],km:["Kilometers",1e3],cm:["Centimeters",.01],mm:["Millimeters",.001],um:["Micrometers",1e-6],in:["Inches",.0254],ft:["Feet",.3048],yd:["Yards",.9144],mi:["Miles",1609.344],nmi:["Nautical miles",1852]},
+ Weight:{kg:["Kilograms",1],g:["Grams",.001],mg:["Milligrams",1e-6],t:["Metric tons",1000],lb:["Pounds",.45359237],oz:["Ounces",.028349523125],st:["Stones",6.35029318],ton:["US tons",907.18474]},
+ Temperature:{c:["Celsius"],f:["Fahrenheit"],k:["Kelvin"]},
+ Volume:{l:["Liters",1],ml:["Milliliters",.001],m3:["Cubic meters",1000],gal:["US gallons",3.785411784],qt:["US quarts",.946352946],pt:["US pints",.473176473],cup:["US cups",.2365882365],floz:["US fluid ounces",.0295735295625],tbsp:["Tablespoons",.01478676478125],tsp:["Teaspoons",.00492892159375],ft3:["Cubic feet",28.316846592],igal:["UK gallons",4.54609]},
+ Area:{m2:["Square meters",1],km2:["Square kilometers",1e6],ft2:["Square feet",.09290304],in2:["Square inches",.00064516],yd2:["Square yards",.83612736],ac:["Acres",4046.8564224],ha:["Hectares",1e4],mi2:["Square miles",2589988.110336]},
+ Speed:{mps:["Meters per second",1],kph:["Kilometers per hour",1/3.6],mph:["Miles per hour",.44704],kn:["Knots",1852/3600],fps:["Feet per second",.3048]},
+ Time:{s:["Seconds",1],ms:["Milliseconds",.001],min:["Minutes",60],h:["Hours",3600],d:["Days",86400],wk:["Weeks",604800],mo:["Months (average)",2629746],yr:["Years (365.25 days)",31557600]},
+ Pressure:{pa:["Pascals",1],kpa:["Kilopascals",1e3],bar:["Bar",1e5],psi:["PSI",6894.757293168],atm:["Atmospheres",101325],mmhg:["mmHg",133.322387415],inhg:["Inches of mercury",3386.389]},
+ Energy:{j:["Joules",1],kj:["Kilojoules",1e3],cal:["Calories",4.184],kcal:["Kilocalories (food)",4184],wh:["Watt-hours",3600],kwh:["Kilowatt-hours",3.6e6],btu:["BTU",1055.05585262]},
+ Power:{w:["Watts",1],kw:["Kilowatts",1e3],hp:["Horsepower",745.69987158227],btuh:["BTU per hour",.29307107],va:["Volt-amps (at PF 1)",1]},
+ Angle:{deg:["Degrees",1],rad:["Radians",180/Math.PI],grad:["Gradians",.9],turn:["Turns",360],arcmin:["Arcminutes",1/60],arcsec:["Arcseconds",1/3600]}};
+const DEF={Length:["ft","m"],Weight:["lb","kg"],Temperature:["f","c"],Volume:["gal","l"],Area:["ft2","m2"],Speed:["mph","kph"],Time:["h","min"],Pressure:["psi","bar"],Energy:["kwh","btu"],Power:["w","btuh"],Angle:["deg","rad"]};
+const s=Object.assign({cat:"Length",v:"1",from:"ft",to:"m"},DT.get("units",{}));
+function toBase(cat,u,v){if(cat!=="Temperature")return v*U[cat][u][1];return u==="c"?v:u==="f"?(v-32)*5/9:v-273.15}
+function fromBase(cat,u,v){if(cat!=="Temperature")return v/U[cat][u][1];return u==="c"?v:u==="f"?v*9/5+32:v+273.15}
+function fmt(x){if(!isFinite(x))return"–";const a=Math.abs(x);if(a!==0&&(a>=1e12||a<1e-6))return x.toExponential(6).replace(/\.?0+e/,"e");return(+x.toPrecision(10)).toLocaleString(undefined,{maximumFractionDigits:10})}
+$("#cats").innerHTML=Object.keys(U).map(c=>`<button type="button" data-c="${c}">${c}</button>`).join("");
+function opts(){const o=Object.entries(U[s.cat]).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join("");$("#from").innerHTML=o;$("#to").innerHTML=o;$("#from").value=s.from;$("#to").value=s.to}
+function run(){DT.set("units",s);DT.$$("[data-c]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.c===s.cat));
+ const v=parseFloat(String(s.v).replace(/,/g,""));if(isNaN(v)){$("#res").textContent="Enter a number.";$("#all tbody").innerHTML="";return}
+ const base=toBase(s.cat,s.from,v),r=fromBase(s.cat,s.to,base);
+ $("#res").innerHTML=`<span class="code">${fmt(v)}</span> ${DT.esc(U[s.cat][s.from][0].toLowerCase())} = <strong class="code">${fmt(r)}</strong> ${DT.esc(U[s.cat][s.to][0].toLowerCase())} <button class="btn sm ghost" type="button" id="cpr">Copy</button>`;
+ $("#cpr").onclick=e=>DT.copy(String(+r.toPrecision(12)),e.currentTarget);
+ $("#allH").textContent=`${fmt(v)} ${U[s.cat][s.from][0].toLowerCase()} in every unit`;
+ $("#all tbody").innerHTML=Object.entries(U[s.cat]).map(([k,[n]])=>`<tr${k===s.to?' class="hl"':""}><th scope="row">${n}</th><td class="code">${fmt(fromBase(s.cat,k,base))}</td></tr>`).join("")}
+DT.$$("[data-c]").forEach(b=>b.onclick=()=>{s.cat=b.dataset.c;[s.from,s.to]=DEF[s.cat];opts();run()});
+$("#v").value=s.v;$("#v").oninput=e=>{s.v=e.target.value;run()};
+$("#from").onchange=e=>{s.from=e.target.value;run()};$("#to").onchange=e=>{s.to=e.target.value;run()};
+$("#swap").onclick=()=>{[s.from,s.to]=[s.to,s.from];opts();run()};
+opts();run();
+
+</script>
+</body>
+</html>

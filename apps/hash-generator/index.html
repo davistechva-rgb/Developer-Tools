@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hash Generator | Developer Tools</title>
+<meta name="description" content="MD5, SHA-1, SHA-256, SHA-384, and SHA-512 of any text, with optional HMAC key">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.hashes th{width:90px;white-space:nowrap;color:var(--ink)}
+.hashes td.h{word-break:break-all;font-size:.88rem}
+.hashes tr:last-child>*{border-bottom:0}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="stack">
+ <section class="panel" aria-labelledby="in-h">
+  <div class="panel-h"><label class="h" id="in-h" for="txt">Text to hash</label><span class="hint" id="cnt"></span></div>
+  <textarea id="txt" spellcheck="false" placeholder="Type or paste text. Hashes update as you type." style="min-height:160px"></textarea>
+  <div class="row mt spread">
+   <div class="row">
+    <label class="chk"><input type="checkbox" id="useKey"> Use a secret key (HMAC)</label>
+    <input type="text" id="key" placeholder="Secret key" spellcheck="false" autocomplete="off" style="max-width:280px" hidden>
+   </div>
+   <div class="row">
+    <div class="seg" role="group" aria-label="Output format"><button type="button" data-fmt="hex">Hex</button><button type="button" data-fmt="b64">Base64</button></div>
+    <label class="chk"><input type="checkbox" id="upper"> Uppercase</label>
+   </div>
+  </div>
+ </section>
+ <section class="panel" aria-labelledby="out-h">
+  <div class="panel-h"><h2 id="out-h">Hashes</h2><span class="hint">MD5 and SHA-1 are fine for checksums, not for security.</span></div>
+  <table class="t hashes"><tbody id="rows"></tbody></table>
+  <p class="status bad mt" id="noCrypto" hidden>This browser blocks hashing on pages that aren't served over HTTPS. Open the tool from your Netlify site instead.</p>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("hash-generator");
+
+const $=DT.$,s=Object.assign({fmt:"hex",upper:false,useKey:false},DT.get("hashgen",{}));
+$("#upper").checked=s.upper;$("#useKey").checked=s.useKey;$("#key").hidden=!s.useKey;
+$("#rows").innerHTML=DT.ALGOS.map(a=>`<tr><th scope="row">${a}</th><td class="code h" data-a="${a}"></td><td style="width:1%"><button class="btn sm" type="button" data-c="${a}">Copy</button></td></tr>`).join("");
+DT.$$("[data-c]").forEach(b=>b.onclick=()=>DT.copy($(`[data-a="${b.dataset.c}"]`).textContent,b));
+let seq=0;
+async function run(){
+ DT.set("hashgen",s);DT.$$("[data-fmt]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.fmt===s.fmt));
+ if(!DT.canHash()){$("#noCrypto").hidden=false;return}
+ const t=$("#txt").value,b=DT.utf8(t),my=++seq;
+ $("#cnt").textContent=`${[...t].length.toLocaleString()} characters, ${b.length.toLocaleString()} bytes (UTF-8)`;
+ const key=s.useKey?DT.utf8($("#key").value):null;
+ for(const a of DT.ALGOS){const h=key?await DT.hmac(a,key,b):await DT.digest(a,b);if(my!==seq)return;
+  let o=s.fmt==="hex"?DT.hex(h):DT.b64(h);if(s.upper&&s.fmt==="hex")o=o.toUpperCase();$(`[data-a="${a}"]`).textContent=o}
+ $(".hashes").closest(".panel").querySelector("h2").textContent=key?"HMAC values":"Hashes";
+}
+$("#txt").addEventListener("input",run);$("#key").addEventListener("input",run);
+$("#upper").onchange=e=>{s.upper=e.target.checked;run()};
+$("#useKey").onchange=e=>{s.useKey=e.target.checked;$("#key").hidden=!s.useKey;if(s.useKey)$("#key").focus();run()};
+DT.$$("[data-fmt]").forEach(b=>b.onclick=()=>{s.fmt=b.dataset.fmt;run()});
+run();
+
+</script>
+</body>
+</html>

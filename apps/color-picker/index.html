@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Color Picker | Developer Tools</title>
+<meta name="description" content="Pick a color and get HEX, RGB, HSL, and contrast">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.swatch{height:200px;border-radius:var(--r);border:1px solid var(--line);display:flex;align-items:flex-end;padding:14px 16px}
+.swatch span{font:700 1.6rem/1 var(--mono);font-stretch:87.5%}
+.sliders{display:grid;grid-template-columns:auto 1fr 3.5em;gap:12px 14px;align-items:center}
+.sliders .lbl{margin:0}.sliders output{font-family:var(--mono);font-stretch:87.5%;text-align:right;font-size:.9rem}
+.sliders input[type=range]{appearance:none;height:14px;border-radius:7px;border:1px solid var(--line)}
+.sliders input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #000;box-shadow:0 0 0 1px #fff}
+.sliders input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #000}
+.sec{font:700 1rem/1.3 var(--ui);margin:22px 0 8px}
+.ramp{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+.ramp button{height:40px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;font-size:.8rem}
+.ramp.recent button{height:28px}
+#fmts th{white-space:nowrap;color:var(--ink)}#fmts td.code{font-size:.86rem}
+.cn{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}.cn+.cn{margin-top:10px}
+.cn-s{padding:12px;border-radius:var(--r);font-weight:700;text-align:center;border:1px solid var(--line)}
+input[aria-invalid=true]{border-color:var(--bad)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel">
+  <div class="swatch" id="sw"><span id="swName"></span></div>
+  <div class="row mt">
+   <label class="btn" for="native">Choose a color</label><input type="color" id="native" class="sr">
+   <button class="btn" type="button" id="eye" hidden>Pick from screen</button>
+   <input type="text" id="any" spellcheck="false" autocomplete="off" placeholder="Paste any color: #0F2A4A, rgb(…), hsl(…), navy" style="flex:1;min-width:220px">
+  </div>
+  <div class="sliders mt">
+   <label class="lbl" for="h">Hue</label><input type="range" id="h" min="0" max="360"><output id="hv"></output>
+   <label class="lbl" for="sa">Saturation</label><input type="range" id="sa" min="0" max="100"><output id="sv"></output>
+   <label class="lbl" for="li">Lightness</label><input type="range" id="li" min="0" max="100"><output id="lv"></output>
+  </div>
+  <h2 class="sec">Tints and shades</h2>
+  <div class="ramp" id="ramp"></div>
+  <h2 class="sec">Recent</h2><div class="ramp recent" id="recent"></div>
+ </section>
+ <div class="stack">
+  <section class="panel"><div class="panel-h"><h2>Formats</h2></div><table class="t" id="fmts"><tbody></tbody></table></section>
+  <section class="panel"><div class="panel-h"><h2>Text contrast</h2></div><div id="con"></div>
+   <p class="hint mt">WCAG AA needs 4.5 to 1 for normal text and 3 to 1 for large text. AAA needs 7 to 1.</p></section>
+ </div>
+</div>
+</main>
+<script src="../../shared/color.js"></script>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("color-picker");
+
+const $=DT.$;let cur=DTC.parse(DT.get("color.cur","#F2B33D"));let recent=DT.get("color.recent",[]);
+function set(c,from){if(!c)return;cur=c;DT.set("color.cur",DTC.hex(c));const hex=DTC.hex(c),hsl=DTC.hsl(c);
+ $("#sw").style.background=hex;$("#sw").style.color=DTC.textOn(c);$("#swName").textContent=hex.toUpperCase();$("#native").value=hex;
+ if(from!=="slider"){$("#h").value=Math.round(hsl.h);$("#sa").value=Math.round(hsl.s);$("#li").value=Math.round(hsl.l)}
+ $("#hv").textContent=$("#h").value+"°";$("#sv").textContent=$("#sa").value+"%";$("#lv").textContent=$("#li").value+"%";
+ $("#h").style.background=`linear-gradient(90deg,${[0,60,120,180,240,300,360].map(x=>`hsl(${x} ${hsl.s}% ${hsl.l}%)`)})`;
+ $("#sa").style.background=`linear-gradient(90deg,hsl(${hsl.h} 0% ${hsl.l}%),hsl(${hsl.h} 100% ${hsl.l}%))`;
+ $("#li").style.background=`linear-gradient(90deg,#000,hsl(${hsl.h} ${hsl.s}% 50%),#fff)`;
+ const F=[["HEX",DTC.fmt.hex(c).toUpperCase()],["RGB",DTC.fmt.rgbLegacy(c)],["RGB (modern)",DTC.fmt.rgb(c)],["HSL",DTC.fmt.hsl(c)],["HSV",DTC.fmt.hsv(c)],["CMYK",DTC.fmt.cmyk(c)],["CSS variable",`--brand: ${hex};`],["Integer",String(parseInt(hex.slice(1),16))]];
+ $("#fmts tbody").innerHTML=F.map(([k,v],i)=>`<tr><th scope="row">${k}</th><td class="code">${v}</td><td style="width:1%"><button class="btn sm" type="button" data-i="${i}">Copy</button></td></tr>`).join("");
+ DT.$$("#fmts [data-i]").forEach(b=>b.onclick=()=>DT.copy(F[b.dataset.i][1],b));
+ const W={r:255,g:255,b:255},K={r:0,g:0,b:0};
+ $("#con").innerHTML=[["White text",W,"#fff"],["Black text",K,"#000"]].map(([n,t,th])=>{const r=DTC.contrast(c,t);
+  return`<div class="cn"><div class="cn-s" style="background:${hex};color:${th}">Aa Sample text</div><div><b>${n}: ${r.toFixed(2)} to 1</b><div class="hint">${r>=7?"Passes AAA":r>=4.5?"Passes AA":r>=3?"Large text only":"Fails"}</div></div></div>`}).join("");
+ $("#ramp").innerHTML=[.85,.7,.55,.4,.25,.1,0,-.15,-.3,-.45,-.6,-.75].map(t=>{const m=t>=0?DTC.mix(c,W,t):DTC.mix(c,K,-t);const h=DTC.hex(m);return`<button type="button" style="background:${h};color:${DTC.textOn(m)}" data-c="${h}" title="${h}" aria-label="${h}">${t===0?"●":""}</button>`}).join("");
+ DT.$$("#ramp [data-c]").forEach(b=>b.onclick=()=>{set(DTC.parse(b.dataset.c));remember()});
+ drawRecent()}
+function remember(){const h=DTC.hex(cur);recent=[h,...recent.filter(x=>x!==h)].slice(0,12);DT.set("color.recent",recent);drawRecent()}
+function drawRecent(){$("#recent").innerHTML=recent.length?recent.map(h=>`<button type="button" style="background:${h}" data-c="${h}" title="${h}" aria-label="${h}"></button>`).join(""):'<span class="hint">Colors you pick show up here.</span>';
+ DT.$$("#recent [data-c]").forEach(b=>b.onclick=()=>set(DTC.parse(b.dataset.c)))}
+$("#native").addEventListener("input",e=>set(DTC.parse(e.target.value)));$("#native").addEventListener("change",remember);
+$("#any").addEventListener("input",e=>{const c=DTC.parse(e.target.value);e.target.setAttribute("aria-invalid",!c&&!!e.target.value);if(c)set(c)});
+$("#any").addEventListener("change",()=>{if(DTC.parse($("#any").value))remember()});
+["h","sa","li"].forEach(id=>$("#"+id).addEventListener("input",()=>set(DTC.fromHsl(+$("#h").value,+$("#sa").value,+$("#li").value),"slider")));
+["h","sa","li"].forEach(id=>$("#"+id).addEventListener("change",remember));
+if("EyeDropper" in window){$("#eye").hidden=false;$("#eye").onclick=async()=>{try{const r=await new EyeDropper().open();set(DTC.parse(r.sRGBHex));remember()}catch(e){}}}
+set(cur);
+
+</script>
+</body>
+</html>

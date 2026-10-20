@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DNS Record Reference | Developer Tools</title>
+<meta name="description" content="A, AAAA, CNAME, MX, TXT, SRV, and the rest">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{appearance:none;border:1px solid var(--line);background:none;color:var(--ink);font:700 .88rem var(--ui);padding:7px 12px;border-radius:var(--r);cursor:pointer}
+.chip:hover{border-color:var(--line-strong)}.chip[aria-pressed=true]{background:var(--line-strong);color:var(--bg);border-color:var(--line-strong)}
+.rt td{line-height:1.5}.rt td.code{white-space:nowrap;font-weight:600;color:var(--accent)}
+.rt td.name{font-weight:700;min-width:140px}.rt td.dim{color:var(--muted);font-size:.9rem;min-width:200px}
+.rt td.ex{font-family:var(--mono);font-stretch:87.5%;font-size:.82rem;color:var(--muted);word-break:break-all;min-width:200px}
+.tg{display:inline-block;border:1px solid var(--line);border-radius:var(--r);padding:1px 7px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+kbd{display:inline-block;font:600 .8rem/1 var(--mono);font-stretch:87.5%;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;padding:4px 6px;background:var(--inset);white-space:nowrap}
+.plus{color:var(--muted);margin:0 2px;font-size:.8rem}
+.rt td.keys{white-space:nowrap}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row"><label class="sr" for="q">Search</label><input type="search" id="q" placeholder="Search records, like mail or SPF" autocomplete="off" style="flex:1;min-width:220px;font-family:var(--ui);font-size:1.05rem"><span class="hint" id="cnt"></span></div>
+ <div class="chips mt" id="chips" role="group" aria-label="Filter"></div>
+</section>
+<section class="panel" style="margin-top:28px"><div style="overflow-x:auto"><table class="t rt" id="tbl"><thead></thead><tbody></tbody></table></div>
+ <p class="hint mt" id="empty" hidden>Nothing matches that search.</p><p class="hint mt">TTL is in seconds: 3600 is one hour. Lower it a day before a planned change so the switch happens faster. Look up live records with <span class="code">nslookup -type=MX example.com</span> or <span class="code">dig MX example.com</span>.</p></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("dns-records");
+
+const $=DT.$;const COLS=[{"h": "Type", "i": 1, "cls": "code"}, {"h": "What it's for", "i": 2}, {"h": "Example", "i": 3, "cls": "ex"}, {"h": "Good to know", "i": 4, "cls": "dim"}, {"h": "Group", "i": 0, "cls": "tag", "grp": 1}],ROWS=[["Common", "A", "Points a name to an IPv4 address.", "www  3600  IN  A  203.0.113.10", "The most common record. You can have several for basic load sharing."], ["Common", "AAAA", "Points a name to an IPv6 address.", "www  3600  IN  AAAA  2001:db8::10", ""], ["Common", "CNAME", "Makes a name an alias of another name.", "shop  3600  IN  CNAME  shops.myshopify.com.", "Can't sit at the root domain, and can't share a name with other records."], ["Common", "MX", "Where email for the domain is delivered. Lower number means higher priority.", "@  3600  IN  MX  1  smtp.google.com.", "Must point to a name, never an IP address or a CNAME."], ["Common", "TXT", "Free text. Used for verification and email security.", "@  3600  IN  TXT  \"google-site-verification=…\"", "Long values are split into 255-character chunks automatically."], ["Common", "NS", "Which name servers are in charge of the domain or a subdomain.", "@  86400  IN  NS  ns1.registrar-servers.com.", "Changing NS at the registrar moves control of all DNS."], ["Common", "SOA", "Start of authority: primary server, admin email, serial, and timers.", "@ IN SOA ns1.example.com. admin.example.com. 2026093001 7200 3600 1209600 300", "One per zone. The last number is how long failed lookups are cached."], ["Common", "PTR", "Reverse lookup: turns an IP back into a name.", "10.113.0.203.in-addr.arpa.  IN  PTR  mail.example.com.", "Set by whoever owns the IP, usually your ISP or host. Mail servers need it."], ["Email", "SPF (TXT)", "Lists the servers allowed to send email for your domain.", "@  IN  TXT  \"v=spf1 include:_spf.google.com ~all\"", "Only one SPF record per name, and 10 DNS lookups at most."], ["Email", "DKIM (TXT)", "Public key that verifies email signatures.", "google._domainkey  IN  TXT  \"v=DKIM1; k=rsa; p=MIIBIjAN…\"", "The part before ._domainkey is the selector your mail provider gives you."], ["Email", "DMARC (TXT)", "Says what to do with mail that fails SPF and DKIM, and where to send reports.", "_dmarc  IN  TXT  \"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com\"", "Start with p=none to watch, then tighten to quarantine or reject."], ["Email", "MTA-STS (TXT)", "Tells senders to require encrypted delivery to you.", "_mta-sts  IN  TXT  \"v=STSv1; id=20260930\"", "Also needs a policy file on https://mta-sts.yourdomain."], ["Email", "BIMI (TXT)", "Shows your logo next to mail in supporting inboxes.", "default._bimi  IN  TXT  \"v=BIMI1; l=https://example.com/logo.svg\"", "Needs DMARC at quarantine or reject."], ["Services", "SRV", "Where a specific service lives: priority, weight, port, and host.", "_sip._tls  IN  SRV  100 1 443 sipdir.online.lync.com.", "Used by Microsoft 365, SIP phones, XMPP, and Active Directory."], ["Services", "CAA", "Which certificate authorities may issue SSL certificates for the domain.", "@  IN  CAA  0 issue \"letsencrypt.org\"", "If you add one, list every CA you use, or renewals will fail."], ["Services", "HTTPS", "Tells browsers how to connect: HTTP/3 support, alternate endpoints.", "@  IN  HTTPS  1 . alpn=\"h3,h2\"", "Newer. Cloudflare adds it automatically."], ["Services", "SVCB", "General form of the HTTPS record for other services.", "_dns.resolver.arpa  IN  SVCB  1 dns.example.net. alpn=dot", ""], ["Services", "NAPTR", "Rewrites names for phone systems and SIP.", "@  IN  NAPTR  100 10 \"S\" \"SIP+D2U\" \"\" _sip._udp.example.com.", ""], ["Services", "URI", "Maps a name to a URI.", "_ftp._tcp  IN  URI  10 1 \"ftp://ftp.example.com/public\"", ""], ["Provider", "ALIAS / ANAME", "A CNAME-like record allowed at the root domain. Not a real DNS type; the provider resolves it.", "@  ALIAS  myapp.netlify.app.", "Netlify, Cloudflare (CNAME flattening), and DNSimple support it."], ["Security", "DS", "Links a signed zone to its parent (DNSSEC).", "example.com.  IN  DS  2371 13 2 1F987CC6…", "Added at the registrar when turning on DNSSEC."], ["Security", "DNSKEY", "The zone's public DNSSEC keys.", "@  IN  DNSKEY  257 3 13 mdsswUyr3DPW…", ""], ["Security", "RRSIG", "A DNSSEC signature over a set of records.", "(added automatically by signing)", ""], ["Security", "NSEC / NSEC3", "Proves a name doesn't exist in a signed zone.", "(added automatically by signing)", ""], ["Security", "TLSA", "Pins a TLS certificate to a service (DANE).", "_25._tcp.mail  IN  TLSA  3 1 1 0C72AC70…", "Needs DNSSEC."], ["Security", "SSHFP", "Publishes SSH host key fingerprints.", "server  IN  SSHFP  4 2 123456789abcdef…", ""], ["Other", "HINFO", "Host hardware and OS. Rarely used; sometimes returned for ANY queries.", "host  IN  HINFO  \"x86\" \"Linux\"", ""], ["Other", "LOC", "Geographic location of a host.", "@  IN  LOC  37 18 N 78 24 W 120m", ""]],CAT=0;const DEF="";
+const cats=[...new Set(ROWS.map(r=>r[CAT]))];const key="ref.dns-records";let cur=DT.get(key,DEF||"");if(cur&&!cats.includes(cur))cur="";
+$("#chips").innerHTML=(DEF?"":`<button type="button" class="chip" data-c="">All</button>`)+cats.map(c=>`<button type="button" class="chip" data-c="${DT.attr(c)}">${DT.esc(c)}</button>`).join("");
+const kbd=v=>v.split(/\s+or\s+/).map(alt=>alt.split(/(?<=\S)\+(?=\S)/).map(k=>`<kbd>${DT.esc(k)}</kbd>`).join('<span class="plus">+</span>')).join(' <span class="hint">or</span> ');
+function render(){DT.set(key,cur);const words=$("#q").value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+ DT.$$(".chip").forEach(b=>b.setAttribute("aria-pressed",!words.length&&b.dataset.c===cur));
+ const vis=ROWS.filter(r=>(!cur||r[CAT]===cur||words.length)&&words.every(w=>r.join(" ").toLowerCase().includes(w)));
+ const multi=new Set(vis.map(r=>r[CAT])).size>1;const show=COLS.filter(c=>vis.some(r=>r[c.i])&&(!c.grp||multi));
+ $("#tbl thead").innerHTML=`<tr>${show.map(c=>`<th scope="col">${c.h2&&show.some(x=>x.i===c.pair)?c.h2:c.h}</th>`).join("")}</tr>`;
+ $("#tbl tbody").innerHTML=vis.map(r=>`<tr>${show.map(c=>`<td class="${c.cls||""}">${!r[c.i]?"":c.cls==="keys"?kbd(r[c.i]):c.cls==="tag"?`<span class="tg">${DT.esc(r[c.i])}</span>`:DT.esc(r[c.i])}</td>`).join("")}</tr>`).join("");
+ $("#cnt").textContent=`${vis.length} of ${ROWS.length}`;$("#empty").hidden=vis.length>0}
+DT.$$(".chip").forEach(b=>b.onclick=()=>{cur=b.dataset.c;render()});$("#q").addEventListener("input",DT.debounce(render,80));
+document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();$("#q").focus()}});
+render();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IP Address Lookup | Developer Tools</title>
+<meta name="description" content="Who owns an IP address, roughly where it is, and its reverse DNS">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.lk{display:flex;flex-wrap:wrap;gap:10px}
+.lk input{flex:1;min-width:240px;font-size:1.2rem;padding:14px}
+.sum{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center}
+.flag{font-size:3rem;line-height:1;grid-row:span 2}
+.sum h2{margin:0;font:700 clamp(1.4rem,3.6vw,2rem)/1.15 var(--mono);font-stretch:87.5%;word-break:break-all}
+.sum p{margin:0;color:var(--muted);font-size:1.05rem}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.tg{border:1px solid var(--line-strong);border-radius:var(--r);padding:3px 9px;font-size:.82rem;font-weight:700}
+.tg.warn{border-color:var(--warn);color:var(--warn)}
+.kv dd .cp{margin-left:6px;font-family:var(--ui);min-height:26px;padding:3px 8px;font-size:.78rem;vertical-align:middle}
+.mine{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.mine button{text-align:left;background:var(--inset);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);padding:12px 14px;cursor:pointer;font:inherit;display:grid;gap:2px}
+.mine button:hover{border-color:var(--line-strong)}.mine b{font-family:var(--mono);font-stretch:87.5%;word-break:break-all}
+#bulkT td{white-space:nowrap}
+.src{font-size:.82rem}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="seg" role="group" aria-label="Mode" style="margin-bottom:18px"><button type="button" data-m="one">Look up one</button><button type="button" data-m="bulk">Look up a list</button></div>
+<div id="oneV">
+<section class="panel">
+ <label class="lbl" for="q">IP address or domain name</label>
+ <form class="lk" id="f"><input type="text" id="q" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="8.8.8.8, 2606:4700::1111, or davis-tech-support.com"><button class="btn primary" type="submit">Look up</button></form>
+ <div class="mt"><span class="lbl">Your public address</span><div class="mine" id="mine"><p class="hint">Checking…</p></div></div>
+ <p class="hint mt">Lookups send the address you enter to free public services (ipwho.is or ipapi.co for location, RDAP for ownership, Google DNS for names). Private addresses like 192.168.x.x are explained here without sending anything.</p>
+</section>
+<div id="res" aria-live="polite"></div>
+</div>
+<div id="bulkV" hidden>
+<section class="panel">
+ <div class="panel-h"><label class="h" for="bl">Addresses (one per line, or paste a log)</label><span class="hint" id="bc"></span></div>
+ <textarea id="bl" spellcheck="false" placeholder="Paste IPs or a firewall log. Addresses are pulled out automatically." style="min-height:160px"></textarea>
+ <div class="row mt"><button class="btn primary" type="button" id="bgo">Look up all</button><button class="btn sm" type="button" id="bstop" hidden>Stop</button><button class="btn sm" type="button" id="bcsv" disabled>Download CSV</button><span class="hint" id="bst"></span></div>
+ <p class="hint mt">Up to 100 unique addresses, looked up one at a time so the free services don't block you.</p>
+</section>
+<section class="panel" style="margin-top:28px"><div style="overflow-x:auto"><table class="t" id="bulkT"><thead><tr><th scope="col">Address</th><th scope="col">Location</th><th scope="col">Owner / ISP</th><th scope="col">ASN</th><th scope="col">Type</th></tr></thead><tbody></tbody></table></div></section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("ip-lookup");
+const IP={};
+IP.p4=s=>{const m=String(s).trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);if(!m)return null;const o=m.slice(1).map(Number);if(o.some(x=>x>255)||m.slice(1).some(x=>x.length>1&&x[0]==="0"))return null;return((o[0]<<24)>>>0)+(o[1]<<16)+(o[2]<<8)+o[3]};
+IP.s4=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join(".");
+IP.mask=p=>p===0?0:(0xFFFFFFFF<<(32-p))>>>0;
+IP.pfx=m=>{let p=0;while(p<32&&(m>>>(31-p))&1)p++;return IP.mask(p)===m>>>0?p:null};
+IP.bin=n=>[24,16,8,0].map(k=>((n>>>k)&255).toString(2).padStart(8,"0")).join(".");
+IP.type4=n=>{const i=(a,b,p)=>(n&IP.mask(p))>>>0===(IP.p4(a)&IP.mask(p))>>>0;
+ if(i("10.0.0.0",0,8)||i("172.16.0.0",0,12)||i("192.168.0.0",0,16))return"Private (RFC 1918)";if(i("100.64.0.0",0,10))return"Carrier-grade NAT (RFC 6598)";if(i("127.0.0.0",0,8))return"Loopback";
+ if(i("169.254.0.0",0,16))return"Link-local (APIPA: no DHCP answer)";if(i("224.0.0.0",0,4))return"Multicast";if(i("240.0.0.0",0,4))return n===0xFFFFFFFF?"Broadcast":"Reserved";if(i("0.0.0.0",0,8))return"This network";
+ if(i("192.0.2.0",0,24)||i("198.51.100.0",0,24)||i("203.0.113.0",0,24))return"Documentation (TEST-NET)";if(i("198.18.0.0",0,15))return"Benchmarking";return"Public"};
+IP.class4=n=>{const a=n>>>24;return a<128?"A":a<192?"B":a<224?"C":a<240?"D (multicast)":"E (reserved)"};
+IP.p6=str=>{let s=String(str).trim().toLowerCase().replace(/^\[|\]$/g,"").replace(/%.*$/,"");let tail4=null;const m4=s.match(/(\d+\.\d+\.\d+\.\d+)$/);if(m4){const n=IP.p4(m4[1]);if(n===null)return null;s=s.slice(0,-m4[1].length)+((n>>>16).toString(16))+":"+((n&65535).toString(16))}
+ if(!/^[0-9a-f:]+$/.test(s)||(s.match(/::/g)||[]).length>1)return null;let parts;
+ if(s.includes("::")){const [a,b]=s.split("::");const A=a?a.split(":"):[],B=b?b.split(":"):[];if(A.length+B.length>7)return null;parts=[...A,...Array(8-A.length-B.length).fill("0"),...B]}else parts=s.split(":");
+ if(parts.length!==8||parts.some(x=>!/^[0-9a-f]{1,4}$/.test(x)))return null;return parts.reduce((v,x)=>(v<<16n)|BigInt(parseInt(x,16)),0n)};
+IP.full6=v=>Array.from({length:8},(_,i)=>((v>>BigInt(112-16*i))&0xFFFFn).toString(16).padStart(4,"0")).join(":");
+IP.s6=v=>{const g=IP.full6(v).split(":").map(x=>x.replace(/^0+(?=.)/,""));let bs=-1,bl=0;for(let i=0;i<8;){if(g[i]==="0"){let j=i;while(j<8&&g[j]==="0")j++;if(j-i>bl&&j-i>1){bs=i;bl=j-i}i=j}else i++}
+ if(bs<0)return g.join(":");return(g.slice(0,bs).join(":")+"::"+g.slice(bs+bl).join(":"))};
+IP.mask6=p=>p===0?0n:((1n<<128n)-1n)^((1n<<BigInt(128-p))-1n);
+IP.type6=v=>{const top=p=>v>>BigInt(128-p);if(v===0n)return"Unspecified";if(v===1n)return"Loopback";if(top(10)===0x3FAn)return"Link-local";if(top(7)===0x7En)return"Unique local (private)";if(top(8)===0xFFn)return"Multicast";
+ if(top(96)===0xFFFFn)return"IPv4-mapped";if(top(32)===0x20010db8n)return"Documentation";if(top(3)===1n)return"Global unicast (public)";return"Reserved"};
+IP.parse=str=>{str=String(str).trim();let [a,pf]=str.split("/");let p=pf===undefined?null:pf.trim();
+ const sp=a.trim().split(/\s+/);if(sp.length===2&&p===null){a=sp[0];p=sp[1]}
+ const v4=IP.p4(a);if(v4!==null){if(p===null||p==="")p=null;else if(/^\d+$/.test(p)){p=+p;if(p>32)throw"An IPv4 prefix goes from /0 to /32."}else{const m=IP.p4(p);if(m===null)throw"That subnet mask isn't valid.";const pp=IP.pfx(m);if(pp===null){const w=IP.pfx((~m)>>>0);throw"That mask has gaps in it. A valid mask is all 1s followed by all 0s, like 255.255.255.0."}p=pp}return{v:4,n:v4,p}}
+ const v6=IP.p6(a);if(v6!==null){if(p!==null&&p!==""){if(!/^\d+$/.test(p)||+p>128)throw"An IPv6 prefix goes from /0 to /128.";p=+p}else p=null;return{v:6,n:v6,p}}
+ throw"That isn't a valid IPv4 or IPv6 address."};
+
+
+const $=DT.$,s=Object.assign({m:"one",q:"",bl:""},DT.get("iplookup",{}));
+const T=(u,ms=9000)=>{const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal,referrerPolicy:"no-referrer"}).finally(()=>clearTimeout(t))};
+const cache=new Map();
+/* Location: ipwho.is first, ipapi.co as backup. Both are normalized to one shape. */
+async function geo(ip){if(cache.has(ip))return cache.get(ip);let g=null,err="";
+ try{const r=await(await T("https://ipwho.is/"+encodeURIComponent(ip))).json();
+  if(r.success!==false&&r.ip)g={src:"ipwho.is",ip:r.ip,city:r.city,region:r.region,country:r.country,cc:r.country_code,postal:r.postal,lat:r.latitude,lon:r.longitude,isp:r.connection&&r.connection.isp,org:r.connection&&r.connection.org,asn:r.connection&&r.connection.asn,domain:r.connection&&r.connection.domain,tz:r.timezone&&r.timezone.id,flag:r.flag&&r.flag.emoji};
+  else err=r.message||""}catch(e){err="ipwho.is didn't answer"}
+ if(!g)try{const r=await(await T(ip?`https://ipapi.co/${encodeURIComponent(ip)}/json/`:"https://ipapi.co/json/")).json();
+  if(!r.error&&r.ip)g={src:"ipapi.co",ip:r.ip,city:r.city,region:r.region,country:r.country_name,cc:r.country_code,postal:r.postal,lat:r.latitude,lon:r.longitude,isp:r.org,org:r.org,asn:r.asn?String(r.asn).replace(/^AS/,""):null,tz:r.timezone};
+  else err=r.reason||err}catch(e){}
+ if(g&&!g.flag&&g.cc&&/^[A-Z]{2}$/i.test(g.cc))g.flag=String.fromCodePoint(...[...g.cc.toUpperCase()].map(c=>127397+c.charCodeAt(0)));
+ const out=g||{err:err||"The location services couldn't be reached."};cache.set(ip,out);return out}
+/* Ownership from the regional internet registry, via RDAP */
+async function rdap(ip){try{const r=await T("https://rdap.org/ip/"+encodeURIComponent(ip),12000);if(!r.ok)return null;const d=await r.json();
+ const ents=[];(function walk(list){(list||[]).forEach(e=>{ents.push(e);walk(e.entities)})})(d.entities);
+ const vc=e=>{const v=(e.vcardArray||[])[1]||[];const get=k=>(v.find(x=>x[0]===k)||[])[3];return{name:get("fn"),email:get("email"),phone:get("tel")}};
+ const role=r=>ents.find(e=>(e.roles||[]).includes(r));const reg=role("registrant")||role("administrative"),ab=role("abuse");
+ const ev=a=>((d.events||[]).find(e=>e.eventAction===a)||{}).eventDate;
+ const cidr=(d.cidr0_cidrs||[]).map(c=>`${c.v4prefix||c.v6prefix}/${c.length}`).join(", ");
+ const port=d.port43||"";const rir=/arin/.test(port)?"ARIN":/ripe/.test(port)?"RIPE NCC":/apnic/.test(port)?"APNIC":/lacnic/.test(port)?"LACNIC":/afrinic/.test(port)?"AFRINIC":"";
+ return{name:d.name,handle:d.handle,range:d.startAddress&&d.endAddress?`${d.startAddress} – ${d.endAddress}`:"",cidr,type:d.type,country:d.country,owner:reg?vc(reg).name:"",abuse:ab?vc(ab).email:"",abusePhone:ab?vc(ab).phone:"",registered:ev("registration"),changed:ev("last changed"),rir}}catch(e){return null}}
+async function dns(name,type){try{const r=await(await T(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`)).json();return(r.Answer||[]).filter(a=>a.type===({A:1,AAAA:28,PTR:12})[type]).map(a=>a.data.replace(/\.$/,""))}catch(e){return null}}
+function ptrName(p){if(p.v===4)return IP.s4(p.n).split(".").reverse().join(".")+".in-addr.arpa";return IP.full6(p.n).replace(/:/g,"").split("").reverse().join(".")+".ip6.arpa"}
+function local(p){const t=p.v===4?IP.type4(p.n):IP.type6(p.n);const pub=/^(Public|Global unicast)/.test(t);return{t,pub}}
+const NOTE={"Private (RFC 1918)":"This is a private address used inside a home or office network. It isn't unique on the internet, so there's no location or owner to look up. To see where the network is, look up its public address instead.",
+ "Carrier-grade NAT (RFC 6598)":"Your internet provider uses this range to share public addresses between customers. Look up your public address to see the provider.",
+ "Link-local (APIPA: no DHCP answer)":"Windows gives itself a 169.254 address when it can't reach a DHCP server. Check the cable or Wi-Fi, and that the router or DHCP server is up.",
+ "Loopback":"This always means “this same computer.”","Link-local":"Only valid on the local network segment. Every IPv6 device has one.","Unique local (private)":"A private IPv6 address, like 192.168 for IPv4. Not routed on the internet."};
+function row(k,v,cp){return v?`<dt>${k}</dt><dd>${DT.esc(v)}${cp?` <button class="btn sm ghost cp" type="button" data-v="${DT.attr(cp===true?v:cp)}">Copy</button>`:""}</dd>`:""}
+function wire(el){DT.$$(".cp",el).forEach(b=>b.onclick=()=>DT.copy(b.dataset.v,b))}
+function timeIn(tz){try{return new Intl.DateTimeFormat(undefined,{timeZone:tz,hour:"numeric",minute:"2-digit",weekday:"short"}).format(new Date())}catch(e){return""}}
+let seq=0;
+async function lookup(raw){const my=++seq,o=$("#res");raw=raw.trim().replace(/^https?:\/\//i,"").replace(/[\/?#].*$/,"");s.q=raw;DT.set("iplookup",s);
+ if(!raw){o.innerHTML="";return}
+ let p=null,host="";try{p=IP.parse(raw.replace(/^\[(.*)\](:\d+)?$/,"$1").replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/,"$1"))}catch(e){}
+ if(p&&p.p!==null){p.p=null}
+ if(!p){if(!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(raw)){o.innerHTML=`<p class="status bad mt">That isn't an IP address or a domain name<span class="sub">Try something like 8.8.8.8 or example.com.</span></p>`;return}
+  host=raw.toLowerCase();o.innerHTML=`<p class="status mt">Finding the address for ${DT.esc(host)}…</p>`;
+  const [a,aaaa]=await Promise.all([dns(host,"A"),dns(host,"AAAA")]);if(my!==seq)return;
+  if(a===null&&aaaa===null){o.innerHTML=`<p class="status bad mt">Couldn't reach DNS<span class="sub">Check your internet connection.</span></p>`;return}
+  const ips=[...(a||[]),...(aaaa||[])];if(!ips.length){o.innerHTML=`<p class="status bad mt">${DT.esc(host)} has no A or AAAA record<span class="sub">The domain may not exist, or it may not point at a server.</span></p>`;return}
+  p=IP.parse(ips[0]);p.host=host;p.all=ips}
+ const ipStr=p.v===4?IP.s4(p.n):IP.s6(p.n),L=local(p);
+ if(!L.pub){o.innerHTML=`<section class="panel" style="margin-top:28px"><div class="sum"><span class="flag" aria-hidden="true">🏠</span><h2>${DT.esc(ipStr)}</h2><p>${DT.esc(L.t)}</p></div>
+  <p class="mt">${DT.esc(NOTE[L.t]||"This address is reserved for special use, so it has no public owner or location.")}</p><p class="mt"><a href="../ip-calculator/index.html">See its network details in the IP Address Calculator</a></p></section>`;return}
+ o.innerHTML=`<p class="status mt">Looking up ${DT.esc(ipStr)}…</p>`;
+ const [g,r,ptr]=await Promise.all([geo(ipStr),rdap(ipStr),dns(ptrName(p),"PTR")]);if(my!==seq)return;
+ const place=g.err?"":[g.city,g.region,g.country].filter((x,i,a)=>x&&a.indexOf(x)===i).join(", ");
+ const tags=[`IPv${p.v}`,L.t];if(r&&r.rir)tags.push(r.rir);
+ const hostish=((ptr||[])[0]||"")+" "+(g.isp||"")+" "+(g.org||"")+" "+(r&&r.name||"");
+ if(/amazon|aws|google cloud|googleusercontent|microsoft azure|azure|digitalocean|linode|akamai|vultr|ovh|hetzner|oracle cloud|cloudflare/i.test(hostish))tags.push("Hosting or cloud provider");
+ const ll=g.lat!=null&&g.lon!=null?`${(+g.lat).toFixed(4)}, ${(+g.lon).toFixed(4)}`:"";
+ o.innerHTML=`<section class="panel" style="margin-top:28px"><div class="sum"><span class="flag" aria-hidden="true">${g.flag||"🌐"}</span><h2>${DT.esc(ipStr)}</h2>
+  <p>${DT.esc(place||"Location unavailable")}${g.isp?" · "+DT.esc(g.isp):""}</p></div>
+  <div class="tags">${tags.map(t=>`<span class="tg">${DT.esc(t)}</span>`).join("")}</div>
+  ${p.host?`<p class="hint mt">${DT.esc(p.host)} points to ${p.all.map(DT.esc).join(", ")}. Showing the first one.</p>`:""}</section>
+ <div class="cols" style="margin-top:28px">
+  <section class="panel"><div class="panel-h"><h2>Location</h2><span class="hint src">${g.src?"From "+g.src:""}</span></div>
+   ${g.err?`<p class="status warn">${DT.esc(g.err)}<span class="sub">The free location services may be rate-limiting you. Try again in a minute.</span></p>`:`<dl class="kv">${row("City",g.city)}${row("Region",g.region)}${row("Country",g.country&&`${g.country}${g.cc?" ("+g.cc+")":""}`)}${row("Postal code",g.postal)}${row("Coordinates",ll,true)}${row("Time zone",g.tz&&`${g.tz}${timeIn(g.tz)?", "+timeIn(g.tz)+" there now":""}`)}</dl>
+   ${ll?`<p class="mt"><a href="https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=10/${g.lat}/${g.lon}" target="_blank" rel="noopener noreferrer">Open on a map</a></p>`:""}`}
+   <p class="hint mt">IP location is an estimate. It's usually right about the country, often close on the region, and the city is frequently the ISP's nearest hub, not the person's home.</p></section>
+  <section class="panel"><div class="panel-h"><h2>Network and owner</h2><span class="hint src">${r?"From the "+(r.rir||"regional")+" registry":""}</span></div>
+   <dl class="kv">${row("ISP",g.isp)}${g.org&&g.org!==g.isp?row("Organization",g.org):""}${row("ASN",g.asn&&"AS"+g.asn,true)}${row("ISP domain",g.domain)}
+   ${r?row("Registered to",r.owner)+row("Network name",r.name)+row("Block",r.cidr||r.range,true)+(r.cidr?row("Range",r.range):"")+row("Abuse contact",r.abuse,true)+row("Abuse phone",r.abusePhone)+row("Registered",r.registered&&new Date(r.registered).toLocaleDateString())+row("Last updated",r.changed&&new Date(r.changed).toLocaleDateString()):""}
+   ${row("Reverse DNS",ptr&&ptr.length?ptr.join(", "):(ptr?"None set":""),ptr&&ptr[0])}</dl>
+   ${r?"":`<p class="hint mt">Registry details weren't available.</p>`}
+   ${r&&r.abuse?`<p class="hint mt">To report spam, scans, or attacks from this address, email the abuse contact with timestamps and logs.</p>`:""}
+   <p class="mt"><a href="../ip-calculator/index.html">Open in the IP Address Calculator</a></p></section>
+ </div>`;wire(o)}
+async function mine(){const el=$("#mine");const get=async u=>{try{return(await(await T(u,6000)).json()).ip}catch(e){return null}};
+ const [v4,v6]=await Promise.all([get("https://api4.ipify.org?format=json"),get("https://api6.ipify.org?format=json")]);
+ const list=[[v4,"IPv4"],[v6&&v6!==v4?v6:null,"IPv6"]].filter(x=>x[0]);
+ el.innerHTML=list.length?list.map(([ip,k])=>`<button type="button" data-ip="${DT.attr(ip)}"><span class="hint">Your ${k} address · click to look up</span><b>${DT.esc(ip)}</b></button>`).join("")+(v6?"":`<p class="hint" style="align-self:center">No IPv6 on this connection.</p>`)
+  :`<p class="hint">Couldn't detect it. You may be offline, or a blocker stopped the request.</p>`;
+ DT.$$("[data-ip]",el).forEach(b=>b.onclick=()=>{$("#q").value=b.dataset.ip;lookup(b.dataset.ip)})}
+/* ---------- bulk ---------- */
+let rows=[],stop=false;
+function extract(t){const v4=t.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)||[],v6=t.match(/(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}/gi)||[];const out=[];
+ [...v4,...v6].forEach(x=>{try{const p=IP.parse(x);const k=p.v===4?IP.s4(p.n):IP.s6(p.n);if(!out.includes(k))out.push(k)}catch(e){}});return out}
+function bcount(){const n=extract($("#bl").value).length;$("#bc").textContent=n?`${n} unique address${n===1?"":"es"} found${n>100?" (first 100 will be looked up)":""}`:"";s.bl=$("#bl").value;DT.set("iplookup",s)}
+function brow(r){return`<tr><td class="code">${DT.esc(r.ip)}</td><td>${DT.esc(r.loc)}</td><td>${DT.esc(r.isp)}</td><td class="code">${DT.esc(r.asn)}</td><td><span class="tg${r.pub?"":" warn"}">${DT.esc(r.type)}</span></td></tr>`}
+$("#bgo").onclick=async()=>{const list=extract($("#bl").value).slice(0,100);if(!list.length){$("#bst").textContent="No addresses found.";return}
+ rows=[];stop=false;$("#bulkT tbody").innerHTML="";$("#bgo").disabled=true;$("#bstop").hidden=false;$("#bcsv").disabled=true;
+ for(let i=0;i<list.length&&!stop;i++){$("#bst").textContent=`Looking up ${i+1} of ${list.length}…`;const p=IP.parse(list[i]),L=local(p);let r;
+  if(!L.pub)r={ip:list[i],loc:"–",isp:"–",asn:"",type:L.t,pub:false};
+  else{const g=await geo(list[i]);r={ip:list[i],loc:g.err?"Unavailable":[g.city,g.region,g.cc].filter(Boolean).join(", "),isp:g.isp||g.org||"",asn:g.asn?"AS"+g.asn:"",type:"Public",pub:true};await new Promise(z=>setTimeout(z,350))}
+  rows.push(r);$("#bulkT tbody").insertAdjacentHTML("beforeend",brow(r))}
+ $("#bst").textContent=stop?`Stopped after ${rows.length}.`:`Done: ${rows.length} looked up.`;$("#bgo").disabled=false;$("#bstop").hidden=true;$("#bcsv").disabled=!rows.length};
+$("#bstop").onclick=()=>stop=true;
+$("#bcsv").onclick=()=>DT.download("ip-lookup.csv",[["Address","Location","Owner / ISP","ASN","Type"],...rows.map(r=>[r.ip,r.loc,r.isp,r.asn,r.type])].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n")+"\n","text/csv");
+$("#bl").value=s.bl;$("#bl").addEventListener("input",DT.debounce(bcount,200));
+function mode(){DT.set("iplookup",s);DT.$$("[data-m]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===s.m));$("#oneV").hidden=s.m!=="one";$("#bulkV").hidden=s.m!=="bulk"}
+DT.$$("[data-m]").forEach(b=>b.onclick=()=>{s.m=b.dataset.m;mode()});
+$("#f").onsubmit=e=>{e.preventDefault();lookup($("#q").value)};
+const qp=new URLSearchParams(location.search).get("ip");
+$("#q").value=qp||s.q;mode();bcount();mine();if(qp)lookup(qp);
+
+</script>
+</body>
+</html>

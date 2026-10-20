@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Port Reference | Developer Tools</title>
+<meta name="description" content="Common TCP and UDP ports and what uses them">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{appearance:none;border:1px solid var(--line);background:none;color:var(--ink);font:700 .88rem var(--ui);padding:7px 12px;border-radius:var(--r);cursor:pointer}
+.chip:hover{border-color:var(--line-strong)}.chip[aria-pressed=true]{background:var(--line-strong);color:var(--bg);border-color:var(--line-strong)}
+.rt td{line-height:1.5}.rt td.code{white-space:nowrap;font-weight:600;color:var(--accent)}
+.rt td.name{font-weight:700;min-width:140px}.rt td.dim{color:var(--muted);font-size:.9rem;min-width:200px}
+.rt td.ex{font-family:var(--mono);font-stretch:87.5%;font-size:.82rem;color:var(--muted);word-break:break-all;min-width:200px}
+.tg{display:inline-block;border:1px solid var(--line);border-radius:var(--r);padding:1px 7px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+kbd{display:inline-block;font:600 .8rem/1 var(--mono);font-stretch:87.5%;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;padding:4px 6px;background:var(--inset);white-space:nowrap}
+.plus{color:var(--muted);margin:0 2px;font-size:.8rem}
+.rt td.keys{white-space:nowrap}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row"><label class="sr" for="q">Search</label><input type="search" id="q" placeholder="Search by number or name, like 3389 or printer" autocomplete="off" style="flex:1;min-width:220px;font-family:var(--ui);font-size:1.05rem"><span class="hint" id="cnt"></span></div>
+ <div class="chips mt" id="chips" role="group" aria-label="Filter"></div>
+</section>
+<section class="panel" style="margin-top:28px"><div style="overflow-x:auto"><table class="t rt" id="tbl"><thead></thead><tbody></tbody></table></div>
+ <p class="hint mt" id="empty" hidden>Nothing matches that search.</p><p class="hint mt">Ports 0 to 1023 are well-known system ports, 1024 to 49151 are registered, and above that are temporary ports your computer picks. Test whether a port is open with <span class="code">Test-NetConnection host -Port 443</span> in PowerShell or <span class="code">nc -zv host 443</span>.</p></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("ports");
+
+const $=DT.$;const COLS=[{"h": "Port", "i": 1, "cls": "code"}, {"h": "Protocol", "i": 2, "cls": "tag"}, {"h": "Service", "i": 3, "cls": "name"}, {"h": "Notes", "i": 4, "cls": "dim"}, {"h": "Group", "i": 0, "cls": "tag", "grp": 1}],ROWS=[["Web", "80", "TCP", "HTTP", "Unencrypted web traffic."], ["Web", "443", "TCP, UDP", "HTTPS", "Secure web. UDP 443 is HTTP/3 (QUIC)."], ["Web", "8080", "TCP", "HTTP alternate", "Proxies, dev servers, admin panels."], ["Web", "8443", "TCP", "HTTPS alternate", "UniFi controller, admin panels."], ["Web", "3000", "TCP", "Dev server", "Node, React, Grafana."], ["Web", "5000", "TCP", "Dev server", "Flask; also Synology DSM (HTTP)."], ["Web", "5001", "TCP", "Synology DSM (HTTPS)", ""], ["Web", "8000", "TCP", "Dev server", "Python http.server, Django."], ["Email", "25", "TCP", "SMTP", "Server-to-server mail. Most ISPs block it for homes."], ["Email", "465", "TCP", "SMTPS", "Mail sending with TLS from the start."], ["Email", "587", "TCP", "SMTP submission", "Mail sending from apps and devices, with STARTTLS. Use this for scanners and printers."], ["Email", "110", "TCP", "POP3", ""], ["Email", "995", "TCP", "POP3S", "POP3 over TLS."], ["Email", "143", "TCP", "IMAP", ""], ["Email", "993", "TCP", "IMAPS", "IMAP over TLS."], ["File transfer", "20, 21", "TCP", "FTP", "21 is control, 20 is data (active mode). Unencrypted."], ["File transfer", "22", "TCP", "SSH, SFTP, SCP", "Secure shell and file transfer."], ["File transfer", "69", "UDP", "TFTP", "Firmware and phone provisioning, PXE boot."], ["File transfer", "989, 990", "TCP", "FTPS", "FTP over TLS."], ["File transfer", "873", "TCP", "rsync", ""], ["File transfer", "2049", "TCP, UDP", "NFS", ""], ["Windows", "135", "TCP", "RPC endpoint mapper", "Windows management, DCOM."], ["Windows", "137-139", "TCP, UDP", "NetBIOS", "Legacy Windows file sharing names."], ["Windows", "445", "TCP", "SMB", "Windows file shares. Never expose to the internet."], ["Windows", "3389", "TCP, UDP", "RDP", "Remote Desktop. Put it behind a VPN."], ["Windows", "5985", "TCP", "WinRM (HTTP)", "PowerShell remoting."], ["Windows", "5986", "TCP", "WinRM (HTTPS)", ""], ["Windows", "88", "TCP, UDP", "Kerberos", "Active Directory sign-in."], ["Windows", "389", "TCP, UDP", "LDAP", ""], ["Windows", "636", "TCP", "LDAPS", "LDAP over TLS."], ["Windows", "3268, 3269", "TCP", "Global Catalog", "Active Directory forest searches (3269 is TLS)."], ["Windows", "1433", "TCP", "SQL Server", ""], ["Windows", "1434", "UDP", "SQL Server Browser", ""], ["Network", "53", "TCP, UDP", "DNS", ""], ["Network", "67, 68", "UDP", "DHCP", "67 server, 68 client."], ["Network", "123", "UDP", "NTP", "Time sync."], ["Network", "161, 162", "UDP", "SNMP", "161 polling, 162 traps."], ["Network", "514", "UDP", "Syslog", ""], ["Network", "853", "TCP", "DNS over TLS", ""], ["Network", "1812, 1813", "UDP", "RADIUS", "WPA2/WPA3-Enterprise Wi-Fi sign-in and accounting."], ["Network", "1900", "UDP", "SSDP / UPnP", "Device discovery."], ["Network", "5353", "UDP", "mDNS / Bonjour", "AirPrint, AirPlay, Chromecast discovery."], ["Network", "179", "TCP", "BGP", ""], ["Network", "520", "UDP", "RIP", ""], ["Network", "49", "TCP", "TACACS+", ""], ["VPN", "500", "UDP", "IKE (IPsec)", "Site-to-site and client VPN setup."], ["VPN", "4500", "UDP", "IPsec NAT traversal", ""], ["VPN", "1194", "UDP", "OpenVPN", ""], ["VPN", "51820", "UDP", "WireGuard", "Also UniFi Teleport and WireGuard VPN."], ["VPN", "1701", "UDP", "L2TP", ""], ["VPN", "1723", "TCP", "PPTP", "Outdated and insecure."], ["UniFi", "8080", "TCP", "UniFi device inform", "Access points and switches report to the controller."], ["UniFi", "8443", "TCP", "UniFi controller web UI", "Self-hosted Network Application."], ["UniFi", "3478", "UDP", "UniFi STUN", ""], ["UniFi", "10001", "UDP", "UniFi discovery", ""], ["UniFi", "6789", "TCP", "UniFi speed test", ""], ["UniFi", "7442, 7443", "TCP", "UniFi Protect / Video", ""], ["Phones and video", "5060", "TCP, UDP", "SIP", "VoIP call setup."], ["Phones and video", "5061", "TCP", "SIP over TLS", ""], ["Phones and video", "10000-20000", "UDP", "RTP (typical range)", "VoIP audio. Exact range depends on the PBX."], ["Phones and video", "3478-3481", "UDP", "Microsoft Teams media", ""], ["Phones and video", "8801-8810", "UDP", "Zoom media", ""], ["Phones and video", "554", "TCP, UDP", "RTSP", "IP cameras and NVR streams."], ["Phones and video", "37777", "TCP", "Dahua NVR", ""], ["Phones and video", "8000", "TCP", "Hikvision SDK", ""], ["Printing", "9100", "TCP", "Raw printing (JetDirect)", "Most network printers."], ["Printing", "631", "TCP, UDP", "IPP", "AirPrint and modern printing."], ["Printing", "515", "TCP", "LPD", "Legacy printing."], ["Remote access", "5900", "TCP", "VNC", ""], ["Remote access", "5938", "TCP, UDP", "TeamViewer", ""], ["Remote access", "6568", "TCP", "AnyDesk", ""], ["Remote access", "21115-21119", "TCP", "RustDesk (self-hosted)", ""], ["Remote access", "2222", "TCP", "SSH alternate", "Common non-standard SSH port."], ["Databases", "3306", "TCP", "MySQL / MariaDB", ""], ["Databases", "5432", "TCP", "PostgreSQL", ""], ["Databases", "27017", "TCP", "MongoDB", ""], ["Databases", "6379", "TCP", "Redis", "Never expose to the internet."], ["Databases", "9200", "TCP", "Elasticsearch", ""], ["Databases", "1521", "TCP", "Oracle", ""], ["Databases", "11211", "TCP, UDP", "Memcached", ""], ["Apps and other", "1883", "TCP", "MQTT", "IoT, Home Assistant."], ["Apps and other", "8883", "TCP", "MQTT over TLS", ""], ["Apps and other", "8123", "TCP", "Home Assistant", ""], ["Apps and other", "32400", "TCP", "Plex", ""], ["Apps and other", "8096", "TCP", "Jellyfin / Emby", ""], ["Apps and other", "9000", "TCP", "Portainer (HTTP)", ""], ["Apps and other", "9443", "TCP", "Portainer (HTTPS)", ""], ["Apps and other", "25565", "TCP", "Minecraft", ""], ["Apps and other", "3074", "TCP, UDP", "Xbox Live", ""], ["Apps and other", "3478-3480", "TCP, UDP", "PlayStation Network", ""], ["Apps and other", "27015", "TCP, UDP", "Steam game servers", ""], ["Apps and other", "2375, 2376", "TCP", "Docker API", "2376 is TLS. Never expose 2375."], ["Apps and other", "6443", "TCP", "Kubernetes API", ""], ["Apps and other", "10050, 10051", "TCP", "Zabbix", ""], ["Apps and other", "5666", "TCP", "Nagios NRPE", ""], ["Apps and other", "9090", "TCP", "Prometheus, Cockpit", ""]],CAT=0;const DEF="";
+const cats=[...new Set(ROWS.map(r=>r[CAT]))];const key="ref.ports";let cur=DT.get(key,DEF||"");if(cur&&!cats.includes(cur))cur="";
+$("#chips").innerHTML=(DEF?"":`<button type="button" class="chip" data-c="">All</button>`)+cats.map(c=>`<button type="button" class="chip" data-c="${DT.attr(c)}">${DT.esc(c)}</button>`).join("");
+const kbd=v=>v.split(/\s+or\s+/).map(alt=>alt.split(/(?<=\S)\+(?=\S)/).map(k=>`<kbd>${DT.esc(k)}</kbd>`).join('<span class="plus">+</span>')).join(' <span class="hint">or</span> ');
+function render(){DT.set(key,cur);const words=$("#q").value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+ DT.$$(".chip").forEach(b=>b.setAttribute("aria-pressed",!words.length&&b.dataset.c===cur));
+ const vis=ROWS.filter(r=>(!cur||r[CAT]===cur||words.length)&&words.every(w=>r.join(" ").toLowerCase().includes(w)));
+ const multi=new Set(vis.map(r=>r[CAT])).size>1;const show=COLS.filter(c=>vis.some(r=>r[c.i])&&(!c.grp||multi));
+ $("#tbl thead").innerHTML=`<tr>${show.map(c=>`<th scope="col">${c.h2&&show.some(x=>x.i===c.pair)?c.h2:c.h}</th>`).join("")}</tr>`;
+ $("#tbl tbody").innerHTML=vis.map(r=>`<tr>${show.map(c=>`<td class="${c.cls||""}">${!r[c.i]?"":c.cls==="keys"?kbd(r[c.i]):c.cls==="tag"?`<span class="tg">${DT.esc(r[c.i])}</span>`:DT.esc(r[c.i])}</td>`).join("")}</tr>`).join("");
+ $("#cnt").textContent=`${vis.length} of ${ROWS.length}`;$("#empty").hidden=vis.length>0}
+DT.$$(".chip").forEach(b=>b.onclick=()=>{cur=b.dataset.c;render()});$("#q").addEventListener("input",DT.debounce(render,80));
+document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();$("#q").focus()}});
+render();
+
+</script>
+</body>
+</html>

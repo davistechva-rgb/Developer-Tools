@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JSON Validator | Developer Tools</title>
+<meta name="description" content="Find the exact line and column of a JSON error, and fix common mistakes">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.ed{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--line);border-radius:var(--r);background:var(--inset);overflow:hidden}
+.ed:focus-within{border-color:var(--line-strong);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
+.gut{font:400 .9rem/1.6 var(--mono);font-stretch:87.5%;color:var(--muted);text-align:right;padding:10px 8px 10px 12px;border-right:1px solid var(--line);overflow:hidden;height:480px;user-select:none;min-width:3.2em}
+.gut span{display:block}.gut span.e{color:var(--bg);background:var(--bad);margin:0 -8px 0 -12px;padding:0 8px 0 12px}
+.ed textarea{border:0;border-radius:0;height:480px;min-height:0;resize:none;box-shadow:none!important;background:transparent}
+.causes{margin:0;padding-left:1.2em;display:grid;gap:6px}
+.snip{margin-top:10px;color:var(--bad)}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel"><div class="panel-h"><label class="h" for="in">JSON to check</label><div class="row"><button class="btn sm ghost" type="button" id="bad">Load broken example</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+  <div class="ed"><div class="gut" id="gut" aria-hidden="true"></div><textarea id="in" class="nowrap" spellcheck="false" placeholder="Paste JSON here. It's checked as you type." wrap="off"></textarea></div>
+ </section>
+ <div class="stack">
+  <section class="panel" aria-labelledby="r-h"><div class="panel-h"><h2 id="r-h">Result</h2></div>
+   <div id="res" aria-live="polite"><p class="hint">Paste JSON on the left.</p></div></section>
+  <section class="panel" id="fixP" hidden aria-labelledby="f-h"><div class="panel-h"><h2 id="f-h">Likely causes</h2></div>
+   <ul class="causes" id="causes"></ul>
+   <button class="btn primary mt" type="button" id="fix">Fix common mistakes</button>
+   <p class="hint mt">Removes comments and trailing commas, swaps single quotes for double, and quotes bare keys. Review the result before using it.</p></section>
+ </div>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("json-validator");
+
+const $=DT.$,ta=$("#in"),gut=$("#gut");
+const BAD="{\n  // client list\n  'name': \"Fuqua School\",\n  devices: 412,\n  \"tags\": [\"k12\", \"google\",],\n}";
+function lines(errLine){const n=ta.value.split("\n").length;let h="";for(let i=1;i<=n;i++)h+=`<span${i===errLine?' class="e"':""}>${i}</span>`;gut.innerHTML=h;gut.scrollTop=ta.scrollTop}
+function stats(v){let depth=0,count=0;(function w(x,d){count++;depth=Math.max(depth,d);if(x&&typeof x==="object")Object.values(x).forEach(y=>w(y,d+1))})(v,0);
+ const type=Array.isArray(v)?`Array of ${v.length} item${v.length===1?"":"s"}`:v===null?"null":typeof v==="object"?`Object with ${Object.keys(v).length} key${Object.keys(v).length===1?"":"s"}`:typeof v;
+ return {type,depth,count}}
+function causes(t){const c=[];
+ if(/(^|[^:"'])\/\/|\/\*/.test(t.replace(/"(?:\\.|[^"\\])*"/g,'""')))c.push("Comments. JSON doesn't allow // or /* */ comments.");
+ if(/,\s*[}\]]/.test(t))c.push("A trailing comma before a closing } or ].");
+ if(/'[^'\n]*'/.test(t.replace(/"(?:\\.|[^"\\])*"/g,'""')))c.push("Single quotes. JSON strings and keys need double quotes.");
+ if(/[{,]\s*[A-Za-z_$][\w$]*\s*:/.test(t))c.push("Keys without quotes. Every key must be in double quotes.");
+ if(/\b(undefined|NaN|Infinity)\b/.test(t.replace(/"(?:\\.|[^"\\])*"/g,'""')))c.push("undefined, NaN, or Infinity. These aren't valid JSON values; use null or a number.");
+ if(/[“”‘’]/.test(t))c.push("Curly “smart” quotes, often from Word or email. Replace them with straight quotes.");
+ return c}
+function repair(t){const strs=[];let x=t.replace(/"(?:\\.|[^"\\])*"/g,m=>(strs.push(m),`\u0000${strs.length-1}\u0000`));
+ x=x.replace(/[“”]/g,'"').replace(/[‘’]/g,"'");
+ x=x.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1");
+ x=x.replace(/'((?:\\.|[^'\\])*)'/g,(m,g)=>JSON.stringify(g.replace(/\\'/g,"'")));
+ x=x.replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g,'$1"$2"$3');
+ x=x.replace(/,(\s*[}\]])/g,"$1").replace(/\b(undefined|NaN)\b/g,"null");
+ return x.replace(/\u0000(\d+)\u0000/g,(m,i)=>strs[i])}
+function check(){const t=ta.value,r=$("#res");$("#fixP").hidden=true;
+ if(!t.trim()){lines();r.innerHTML=`<p class="hint">Paste JSON on the left.</p>`;return}
+ try{const v=JSON.parse(t);lines();const st=stats(v);
+  r.innerHTML=`<p class="status good">Valid JSON</p><dl class="kv mt"><dt>Top level</dt><dd>${st.type}</dd><dt>Values</dt><dd>${st.count.toLocaleString()}</dd><dt>Deepest nesting</dt><dd>${st.depth} level${st.depth===1?"":"s"}</dd><dt>Size</dt><dd>${DT.bytes(new Blob([t]).size)}</dd></dl><p class="mt"><a href="../json-formatter/index.html">Format it</a></p>`}
+ catch(e){const er=DT.jsonError(t,e);lines(er.line);
+  let snip="";if(er.line){const L=t.split("\n")[er.line-1]||"";snip=`<pre class="out snip" style="min-height:0">${DT.esc(L)}\n${" ".repeat(Math.max(0,er.col-1))}^</pre>`}
+  r.innerHTML=`<p class="status bad">Invalid JSON${er.line?`<span class="sub">Line ${er.line}, column ${er.col}</span>`:""}</p><p class="mt">${DT.esc(er.msg)}.</p>${snip}${er.line?`<button class="btn sm mt" type="button" id="go">Go to line ${er.line}</button>`:""}`;
+  const go=$("#go");if(go)go.onclick=()=>{ta.focus();ta.setSelectionRange(er.pos,Math.min(er.pos+1,t.length));const lh=parseFloat(getComputedStyle(ta).lineHeight);ta.scrollTop=Math.max(0,(er.line-4)*lh)};
+  const c=causes(t);if(c.length){$("#fixP").hidden=false;$("#causes").innerHTML=c.map(x=>`<li>${DT.esc(x)}</li>`).join("")}}}
+ta.addEventListener("input",DT.debounce(check,150));ta.addEventListener("scroll",()=>gut.scrollTop=ta.scrollTop);
+$("#fix").onclick=()=>{const f=repair(ta.value);try{JSON.parse(f);ta.value=JSON.stringify(JSON.parse(f),null,2);DT.toast("Fixed. Review the changes.")}catch(e){ta.value=f;DT.toast("Partly fixed. Some errors remain.")}check()};
+$("#bad").onclick=()=>{ta.value=BAD;check()};
+$("#clear").onclick=()=>{ta.value="";check();ta.focus()};
+check();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Markdown Editor | Developer Tools</title>
+<meta name="description" content="Write Markdown with a live preview beside it">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.doc{font:400 1rem/1.65 var(--ui);color:var(--ink);overflow-wrap:break-word}
+.doc>:first-child{margin-top:0}
+.doc h1,.doc h2,.doc h3,.doc h4{font-family:var(--mono);font-stretch:87.5%;line-height:1.25;margin:1.6em 0 .5em}
+.doc h1{font-size:1.75rem;padding-bottom:.3em;border-bottom:1px solid var(--line-strong)}
+.doc h2{font-size:1.35rem;padding-bottom:.25em;border-bottom:1px solid var(--line)}
+.doc h3{font-size:1.1rem}.doc h4{font-size:1rem}
+.doc p,.doc ul,.doc ol,.doc blockquote,.doc table,.doc pre{margin:0 0 1em}
+.doc a{color:var(--j-key)}
+.doc code{font:400 .88em/1.5 var(--mono);font-stretch:87.5%;background:var(--inset);border:1px solid var(--line);border-radius:var(--r);padding:.1em .35em}
+.doc pre{background:var(--inset);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;overflow:auto}
+.doc pre code{border:0;padding:0;background:none}
+.doc blockquote{border-left:3px solid var(--accent);padding:.2em 0 .2em 1em;color:var(--muted)}
+.doc table{border-collapse:collapse;display:block;overflow-x:auto}
+.doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.doc th{background:var(--raise)}
+.doc img{max-width:100%}
+.doc hr{border:0;border-top:1px solid var(--line-strong);margin:1.6em 0}
+.doc li+li{margin-top:.25em}
+.doc input[type=checkbox]{accent-color:var(--accent);margin-right:.4em}
+.doc li:has(>input[type=checkbox]){list-style:none;margin-left:-1.3em}
+
+.tb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:18px}.tb-sp{flex:1}
+.ed2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.ed2[data-v=edit]{grid-template-columns:1fr}.ed2[data-v=edit] .p-view{display:none}
+.ed2[data-v=view]{grid-template-columns:1fr}.ed2[data-v=view] .p-edit{display:none}
+.ed2[data-v=view] .prev{max-width:78ch;margin:0 auto}
+#src{height:62vh;min-height:360px;resize:none;font-size:.92rem}
+.prev{height:62vh;min-height:360px;overflow:auto;padding:4px 6px}
+@media (max-width:860px){.ed2,.ed2[data-v]{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="tb" role="toolbar" aria-label="Formatting">
+ <button class="btn sm ghost" type="button" data-a="b" title="Bold (Ctrl+B)"><b>B</b></button>
+ <button class="btn sm ghost" type="button" data-a="i" title="Italic (Ctrl+I)"><i>I</i></button>
+ <button class="btn sm ghost" type="button" data-a="h">Heading</button>
+ <button class="btn sm ghost" type="button" data-a="k" title="Link (Ctrl+K)">Link</button>
+ <button class="btn sm ghost" type="button" data-a="c">Code</button>
+ <button class="btn sm ghost" type="button" data-a="ul">List</button>
+ <button class="btn sm ghost" type="button" data-a="ol">Numbered</button>
+ <button class="btn sm ghost" type="button" data-a="t">Checkbox</button>
+ <button class="btn sm ghost" type="button" data-a="q">Quote</button>
+ <button class="btn sm ghost" type="button" data-a="tbl">Table</button>
+ <span class="tb-sp"></span>
+ <div class="seg" role="group" aria-label="View"><button type="button" data-v="split">Split</button><button type="button" data-v="edit">Write</button><button type="button" data-v="view">Preview</button></div>
+</div>
+<div class="ed2" id="ed2">
+ <section class="panel p-edit"><div class="panel-h"><label class="h" for="src">Markdown</label><div class="row"><span class="hint" id="saved"></span><button class="btn sm ghost" type="button" id="open">Open .md</button><button class="btn sm ghost" type="button" id="new">Start over</button></div></div>
+  <textarea id="src" spellcheck="true"></textarea></section>
+ <section class="panel p-view"><div class="panel-h"><h2>Preview</h2><div class="row">
+  <button class="btn sm" type="button" id="cMd">Copy Markdown</button><button class="btn sm" type="button" id="cHtml">Copy HTML</button>
+  <button class="btn sm" type="button" id="dMd">Save .md</button><button class="btn sm" type="button" id="dHtml">Save .html</button></div></div>
+  <div class="doc prev" id="view" tabindex="0" aria-label="Preview"></div></section>
+</div>
+<p class="hint mt" id="stat"></p>
+</main>
+<script src="../../shared/vendor/marked.min.js"></script>
+<script src="../../shared/vendor/purify.min.js"></script>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("markdown-editor");
+
+DOMPurify.addHook("afterSanitizeAttributes",n=>{if(n.tagName==="A"&&/^https?:/i.test(n.getAttribute("href")||"")){n.setAttribute("target","_blank");n.setAttribute("rel","noopener noreferrer")}});
+function mdRender(src,el){el.innerHTML=DOMPurify.sanitize(marked.parse(src,{gfm:true,breaks:false}));const used={};
+ DT.$$("h1,h2,h3,h4,h5,h6",el).forEach(h=>{let id=h.textContent.toLowerCase().trim().replace(/[^\w\s-]/g,"").replace(/\s+/g,"-")||"section";if(used[id])id+="-"+used[id]++;else used[id]=1;h.id="h-"+id})}
+const EXPORT_CSS="body{font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1a1a1a}h1,h2{border-bottom:1px solid #ddd;padding-bottom:.3em}code{background:#f3f3f3;padding:.1em .35em;border-radius:3px;font-size:.9em}pre{background:#f6f8fa;padding:12px;overflow:auto;border-radius:4px}pre code{background:none;padding:0}blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:1em;color:#555}table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}img{max-width:100%}";
+function mdExport(src){const body=DOMPurify.sanitize(marked.parse(src,{gfm:true}));const t=(src.match(/^#\s+(.+)$/m)||[,"Document"])[1];
+ return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${DT.esc(t)}</title>\n<style>${EXPORT_CSS}</style>\n</head>\n<body>\n${body}\n</body>\n</html>\n`}
+
+const $=DT.$,ta=$("#src"),s=Object.assign({v:"split"},DT.get("mded",{}));
+ta.value=DT.get("mded.draft",null)??"# Project notes\n\nWrite **Markdown** on the left and see it on the right. Your draft saves on this device as you type.\n\n## Checklist\n\n- [x] Back up the file server\n- [ ] Update the UniFi controller\n- [ ] Renew the SSL certificate\n\n## Commands\n\n```powershell\nGet-Service | Where-Object Status -eq 'Stopped'\n```\n\n| Device | Status |\n| --- | --- |\n| Firewall | Online |\n| NAS | Needs update |\n\n> Tip: select text and press Ctrl+B for bold or Ctrl+K for a link.\n";
+const render=DT.debounce(()=>{mdRender(ta.value,$("#view"));const w=(ta.value.match(/\S+/g)||[]).length;$("#stat").textContent=`${w.toLocaleString()} words, ${ta.value.split("\n").length.toLocaleString()} lines.`},120);
+const save=DT.debounce(()=>{DT.set("mded.draft",ta.value);$("#saved").textContent="Draft saved on this device"},500);
+ta.addEventListener("input",()=>{render();save();$("#saved").textContent=""});
+addEventListener("pagehide",()=>DT.set("mded.draft",ta.value));document.addEventListener("visibilitychange",()=>{if(document.hidden)DT.set("mded.draft",ta.value)});
+function view(){DT.set("mded",s);$("#ed2").dataset.v=s.v;DT.$$("[data-v]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===s.v))}
+DT.$$("[data-v]").forEach(b=>b.onclick=()=>{s.v=b.dataset.v;view()});
+function ins(txt,selStart,selEnd){ta.focus();document.execCommand("insertText",false,txt)||ta.setRangeText(txt);if(selStart!=null){const b=ta.selectionEnd-txt.length;ta.setSelectionRange(b+selStart,b+selEnd)}ta.dispatchEvent(new Event("input"))}
+function wrap(a,b,ph){const s0=ta.selectionStart,s1=ta.selectionEnd,sel=ta.value.slice(s0,s1)||ph;ins(a+sel+b,a.length,a.length+sel.length)}
+function lines(prefix){let s0=ta.selectionStart,s1=ta.selectionEnd;s0=ta.value.lastIndexOf("\n",s0-1)+1;let e=ta.value.indexOf("\n",s1);if(e<0)e=ta.value.length;
+ ta.setSelectionRange(s0,e);const L=ta.value.slice(s0,e).split("\n");ins(L.map((l,i)=>(typeof prefix==="function"?prefix(i):prefix)+l).join("\n"))}
+const ACT={b:()=>wrap("**","**","bold text"),i:()=>wrap("*","*","italic text"),c:()=>{const sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);sel.includes("\n")?wrap("```\n","\n```",""):wrap("`","`","code")},
+ k:()=>{const sel=ta.value.slice(ta.selectionStart,ta.selectionEnd)||"link text";ins(`[${sel}](https://)`,sel.length+3,sel.length+11)},
+ h:()=>lines("## "),ul:()=>lines("- "),ol:()=>lines(i=>(i+1)+". "),t:()=>lines("- [ ] "),q:()=>lines("> "),
+ tbl:()=>ins("\n| Column | Column |\n| --- | --- |\n| Cell | Cell |\n")};
+DT.$$("[data-a]").forEach(b=>b.onclick=()=>ACT[b.dataset.a]());
+ta.addEventListener("keydown",e=>{const k=e.key.toLowerCase();if((e.ctrlKey||e.metaKey)&&ACT[k]&&"bik".includes(k)){e.preventDefault();ACT[k]()}
+ else if(e.key==="Tab"&&!e.shiftKey&&!e.ctrlKey){e.preventDefault();ins("  ")}});
+ta.addEventListener("scroll",()=>{if(s.v!=="split")return;const v=$("#view"),r=ta.scrollTop/Math.max(1,ta.scrollHeight-ta.clientHeight);v.scrollTop=r*(v.scrollHeight-v.clientHeight)});
+$("#cMd").onclick=e=>DT.copy(ta.value,e.currentTarget);$("#cHtml").onclick=e=>DT.copy($("#view").innerHTML,e.currentTarget);
+const fname=()=>((ta.value.match(/^#\s+(.+)$/m)||[,"document"])[1].toLowerCase().replace(/[^\w]+/g,"-").replace(/^-|-$/g,"")||"document");
+$("#dMd").onclick=()=>DT.download(fname()+".md",ta.value,"text/markdown");$("#dHtml").onclick=()=>DT.download(fname()+".html",mdExport(ta.value),"text/html");
+$("#new").onclick=()=>{if(ta.value.trim()&&!confirm("Clear the editor? Save your Markdown first if you need it."))return;ta.value="";ta.dispatchEvent(new Event("input"));ta.focus()};
+const fi=document.createElement("input");fi.type="file";fi.accept=".md,.markdown,.txt,text/*";fi.hidden=true;document.body.appendChild(fi);
+$("#open").onclick=()=>fi.click();fi.onchange=async()=>{if(fi.files[0]){ta.value=await fi.files[0].text();ta.dispatchEvent(new Event("input"))}fi.value=""};
+view();mdRender(ta.value,$("#view"));render();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hash Checker | Developer Tools</title>
+<meta name="description" content="Compare two hashes, or verify a download against its published checksum">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.cmp mark{background:var(--bad);color:var(--bg);border-radius:1px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols">
+ <section class="panel" aria-labelledby="v-h">
+  <div class="panel-h"><h2 id="v-h">Verify a download</h2></div>
+  <label class="lbl" for="exp">Published checksum</label>
+  <input type="text" id="exp" spellcheck="false" autocomplete="off" placeholder="Paste the hash from the download page">
+  <div class="row mt spread">
+   <div class="seg" role="group" aria-label="What to check"><button type="button" data-src="file">File</button><button type="button" data-src="text">Text</button></div>
+   <label class="row" style="gap:8px"><span class="lbl" style="margin:0">Algorithm</span><select id="algo"><option value="auto">Match the checksum</option></select></label>
+  </div>
+  <div class="mt" id="fileSrc"><div class="drop" id="drop"><strong>Drop a file here</strong><span class="hint">or click to choose one. It's read on this device and never uploaded.</span></div></div>
+  <div class="mt" id="textSrc" hidden><textarea id="txt" spellcheck="false" placeholder="Text to hash" style="min-height:120px"></textarea></div>
+  <div class="mt" id="vRes" aria-live="polite"></div>
+ </section>
+ <section class="panel" aria-labelledby="c-h">
+  <div class="panel-h"><h2 id="c-h">Compare two hashes</h2></div>
+  <label class="lbl" for="h1">First hash</label>
+  <input type="text" id="h1" spellcheck="false" autocomplete="off">
+  <label class="lbl mt" for="h2">Second hash</label>
+  <input type="text" id="h2" spellcheck="false" autocomplete="off">
+  <p class="hint mt">Spaces, colons, and capital letters are ignored. You can paste whole lines like <span class="code">sha256sum</span> output.</p>
+  <div class="mt" id="cRes" aria-live="polite"></div>
+ </section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("hash-checker");
+
+const $=DT.$;let src=DT.get("hashchk.src","file"),file=null;
+DT.ALGOS.forEach(a=>$("#algo").insertAdjacentHTML("beforeend",`<option>${a}</option>`));
+function diff(a,b){let out="";for(let i=0;i<Math.max(a.length,b.length);i++){const c=b[i]||"";out+=c&&a[i]===c?DT.esc(c):`<mark>${DT.esc(c||" ")}</mark>`}return out}
+function compare(){const a=DT.cleanHash($("#h1").value),b=DT.cleanHash($("#h2").value),o=$("#cRes");
+ if(!a||!b){o.innerHTML="";return}
+ const alg=DT.hashLen[a.length];
+ if(a===b)o.innerHTML=`<p class="status good">They match<span class="sub">${alg?alg+", ":""}${a.length} characters.</span></p>`;
+ else{let i=0;while(a[i]===b[i])i++;
+  o.innerHTML=`<p class="status bad">They don't match<span class="sub">${a.length!==b.length?`Different lengths (${a.length} and ${b.length}), so they're probably different algorithms.`:`First difference at character ${i+1}.`}</span></p>
+  <pre class="out wrapit mt cmp" style="min-height:0">${DT.esc(a)}\n${diff(a,b)}</pre>`}}
+$("#h1").oninput=compare;$("#h2").oninput=compare;
+
+function setSrc(v){src=v;DT.set("hashchk.src",v);DT.$$("[data-src]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.src===v));$("#fileSrc").hidden=v!=="file";$("#textSrc").hidden=v!=="text";verify()}
+DT.$$("[data-src]").forEach(b=>b.onclick=()=>setSrc(b.dataset.src));
+DT.fileDrop($("#drop"),f=>{file=f;$("#drop").innerHTML=`<strong>${DT.esc(f.name)}</strong><span class="hint">${DT.bytes(f.size)}. Click to choose a different file.</span>`;verify()});
+let seq=0;
+async function verify(){const o=$("#vRes"),exp=DT.cleanHash($("#exp").value),my=++seq;
+ if(!DT.canHash()){o.innerHTML=`<p class="status bad">This browser blocks hashing on pages that aren't served over HTTPS. Open the tool from your Netlify site instead.</p>`;return}
+ let algo=$("#algo").value;
+ if(algo==="auto"){algo=DT.hashLen[exp.length];
+  if(!exp){o.innerHTML=`<p class="hint">Paste the published checksum above, then add the ${src==="file"?"file":"text"}.</p>`;return}
+  if(!algo){o.innerHTML=`<p class="status warn">Can't tell the algorithm from a ${exp.length}-character hash<span class="sub">Pick one from the Algorithm menu.</span></p>`;return}}
+ let bytes;
+ if(src==="file"){if(!file){o.innerHTML=`<p class="hint">Now add the file you downloaded.</p>`;return}
+  if(file.size>1.5e9){o.innerHTML=`<p class="status warn">That file is over 1.5 GB<span class="sub">Browsers can run out of memory on files this large. Use certutil (Windows) or shasum (Mac) instead.</span></p>`;return}
+  o.innerHTML=`<p class="status">Reading ${DT.esc(file.name)}…</p>`;bytes=new Uint8Array(await file.arrayBuffer())}
+ else bytes=DT.utf8($("#txt").value);
+ if(my!==seq)return;
+ const got=DT.hex(await DT.digest(algo,bytes));if(my!==seq)return;
+ const btn=`<button class="btn sm" type="button" id="cpy">Copy</button>`;
+ if(!exp){o.innerHTML=`<dl class="kv"><dt>${algo}</dt><dd>${got}</dd></dl><div class="mt">${btn}</div>`}
+ else if(got===exp)o.innerHTML=`<p class="status good">Checksum matches<span class="sub">This ${src} is identical to the one the checksum was made from (${algo}).</span></p><dl class="kv mt"><dt>Calculated</dt><dd>${got}</dd></dl>`;
+ else o.innerHTML=`<p class="status bad">Checksum doesn't match<span class="sub">${exp.length!==got.length?`The published checksum has ${exp.length} characters but ${algo} makes ${got.length}. Check the algorithm.`:"The file may be corrupted, incomplete, or not the original. Download it again from the official source."}</span></p><dl class="kv mt"><dt>Expected</dt><dd>${exp}</dd><dt>Calculated</dt><dd>${got}</dd></dl>`;
+ const c=$("#cpy");if(c)c.onclick=e=>DT.copy(got,e.currentTarget)}
+$("#exp").addEventListener("input",DT.debounce(verify,200));$("#algo").onchange=verify;$("#txt").addEventListener("input",DT.debounce(verify,200));
+setSrc(src);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Line Counter | Developer Tools</title>
+<meta name="description" content="Count lines, blank lines, and the longest line">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.ed{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--line);border-radius:var(--r);background:var(--inset);overflow:hidden}
+.ed:focus-within{border-color:var(--line-strong);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
+.gut{font:400 .9rem/1.6 var(--mono);font-stretch:87.5%;color:var(--muted);text-align:right;padding:10px 8px 10px 12px;border-right:1px solid var(--line);overflow:hidden;height:520px;user-select:none;min-width:3.4em;white-space:pre;margin:0}
+.ed textarea{border:0;border-radius:0;height:520px;min-height:0;resize:none;box-shadow:none!important;background:transparent}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.nums div{border-left:2px solid var(--line-strong);padding-left:10px}
+.nums output{display:block;font:700 1.8rem/1.1 var(--mono);font-stretch:87.5%;font-variant-numeric:tabular-nums}
+.nums span{color:var(--muted);font-size:.85rem}
+.lnk{background:none;border:0;padding:0;color:var(--j-key);text-decoration:underline;cursor:pointer;font:inherit}
+.warn-t{color:var(--warn);margin-left:4px}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel"><div class="panel-h"><label class="h" for="in">Text or file</label><div class="row"><button class="btn sm ghost" type="button" id="open">Open file</button><button class="btn sm ghost" type="button" id="clear">Clear</button></div></div>
+  <div class="ed"><div class="gut" id="gut" aria-hidden="true"></div><textarea id="in" class="nowrap" wrap="off" spellcheck="false" placeholder="Paste text, or open a log, CSV, or script"></textarea></div>
+  <p class="hint mt" id="file"></p></section>
+ <div class="stack">
+  <section class="panel"><div class="panel-h"><h2>Lines</h2></div>
+   <div class="nums"><div><output id="total">0</output><span>total lines</span></div><div><output id="nonblank">0</output><span>with text</span></div><div><output id="blank">0</output><span>blank</span></div></div>
+   <dl class="kv mt" id="kv"></dl></section>
+  <section class="panel"><div class="panel-h"><label class="h" for="lim">Lines longer than</label><input type="number" id="lim" min="1" style="max-width:100px"></div>
+   <div id="long" aria-live="polite"></div></section>
+ </div>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("line-counter");
+
+const $=DT.$,ta=$("#in"),gut=$("#gut"),s=Object.assign({lim:80},DT.get("lines",{}));$("#lim").value=s.lim;
+function gutter(n){let h="";const m=Math.min(n,20000);for(let i=1;i<=m;i++)h+=i+"\n";gut.textContent=h;gut.scrollTop=ta.scrollTop}
+let raw=null;
+function run(){DT.set("lines",s);const t=raw??ta.value;
+ if(!t){["total","nonblank","blank"].forEach(i=>$("#"+i).textContent=0);$("#kv").innerHTML="";$("#long").innerHTML="";gutter(1);return}
+ const crlf=(t.match(/\r\n/g)||[]).length,lf=(t.match(/(?<!\r)\n/g)||[]).length,cr=(t.match(/\r(?!\n)/g)||[]).length;
+ let L=t.split(/\r\n|\r|\n/);const endsNL=/(\r\n|\r|\n)$/.test(t);if(endsNL)L.pop();
+ const blank=L.filter(x=>!x.trim()).length,uniq=new Set(L).size;
+ let longest=0,li=0,shortest=Infinity,si=0,sum=0,trail=0,tabs=0;
+ L.forEach((x,i)=>{const n=[...x].length;sum+=n;if(n>longest){longest=n;li=i}if(x.trim()&&n<shortest){shortest=n;si=i}if(/[ \t]+$/.test(x))trail++;if(/^\t/.test(x))tabs++});
+ $("#total").textContent=L.length.toLocaleString();$("#nonblank").textContent=(L.length-blank).toLocaleString();$("#blank").textContent=blank.toLocaleString();
+ const le=[crlf&&`Windows (CRLF) ×${crlf.toLocaleString()}`,lf&&`Unix (LF) ×${lf.toLocaleString()}`,cr&&`Old Mac (CR) ×${cr.toLocaleString()}`].filter(Boolean);
+ $("#kv").innerHTML=`<dt>Unique lines</dt><dd>${uniq.toLocaleString()}${uniq<L.length?` (${(L.length-uniq).toLocaleString()} repeats)`:""}</dd>
+  <dt>Longest line</dt><dd>${longest.toLocaleString()} characters, line ${(li+1).toLocaleString()}</dd>
+  ${shortest<Infinity?`<dt>Shortest line</dt><dd>${shortest.toLocaleString()} characters, line ${(si+1).toLocaleString()}</dd>`:""}
+  <dt>Average length</dt><dd>${(sum/Math.max(1,L.length)).toFixed(1)} characters</dd>
+  <dt>Characters</dt><dd>${[...t].length.toLocaleString()}</dd>
+  <dt>Line endings</dt><dd>${raw==null?"Open the file to check. Pasted text is always converted to LF.":le.length?le.join(", ")+(le.length>1?" <strong class='warn-t'>mixed</strong>":""):"None (single line)"}</dd>
+  <dt>Ends with a newline</dt><dd>${endsNL?"Yes":"No"}</dd>
+  ${trail?`<dt>Trailing spaces</dt><dd>${trail.toLocaleString()} line${trail===1?"":"s"}</dd>`:""}
+  ${tabs?`<dt>Tab-indented</dt><dd>${tabs.toLocaleString()} line${tabs===1?"":"s"}</dd>`:""}`;
+ const lim=Math.max(1,+s.lim||80),over=[];L.forEach((x,i)=>{if([...x].length>lim)over.push(i)});
+ $("#long").innerHTML=over.length?`<p class="hint">${over.length.toLocaleString()} line${over.length===1?"":"s"}: ${over.slice(0,60).map(i=>`<button class="lnk" type="button" data-l="${i}">${i+1}</button>`).join(", ")}${over.length>60?", …":""}</p>`:`<p class="hint">None.</p>`;
+ DT.$$("[data-l]").forEach(b=>b.onclick=()=>go(+b.dataset.l,L));
+ gutter(L.length+(endsNL?1:0))}
+function go(i,L){let p=0;for(let k=0;k<i;k++)p+=L[k].length+1;ta.focus();ta.setSelectionRange(p,p+L[i].length);ta.scrollTop=Math.max(0,(i-3)*parseFloat(getComputedStyle(ta).lineHeight))}
+ta.addEventListener("input",DT.debounce(()=>{raw=null;$("#file").textContent="";run()},150));ta.addEventListener("scroll",()=>gut.scrollTop=ta.scrollTop);
+$("#lim").oninput=e=>{s.lim=+e.target.value;run()};
+$("#clear").onclick=()=>{raw=null;ta.value="";$("#file").textContent="";run();ta.focus()};
+const fi=document.createElement("input");fi.type="file";fi.hidden=true;document.body.appendChild(fi);
+$("#open").onclick=()=>fi.click();fi.onchange=async()=>{const f=fi.files[0];if(f){if(f.size>50e6){$("#file").textContent="That file is over 50 MB, which is too large to open here.";return}raw=await f.text();ta.value=raw;$("#file").textContent=`${f.name}, ${DT.bytes(f.size)}`;run()}fi.value=""};
+run();
+
+</script>
+</body>
+</html>

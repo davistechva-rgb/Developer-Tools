@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Developer Calculator | Developer Tools</title>
+<meta name="description" content="Bitwise math in any base">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.res{margin-top:14px}.res th{width:60px;color:var(--muted)}.res td.code{font-size:1.05rem;word-break:break-all}
+.sec{font:700 1rem/1.3 var(--ui);margin:22px 0 8px}
+.bitg{display:grid;grid-template-columns:repeat(16,1fr);gap:3px}
+.bitg button{appearance:none;border:1px solid var(--line);background:var(--inset);color:var(--muted);border-radius:1px;padding:4px 0 2px;cursor:pointer;display:grid;font:600 .9rem var(--mono);font-stretch:87.5%}
+.bitg button.on{background:color-mix(in srgb,var(--accent) 25%,var(--inset));color:var(--ink);border-color:var(--accent)}
+.bitg button:nth-child(8n):not(:last-child){margin-right:6px}
+.bitg small{font-size:.6rem;color:var(--muted);height:.8rem}
+.hist{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:560px;overflow:auto}
+.hist button{width:100%;text-align:left;background:none;border:1px solid transparent;border-bottom-color:var(--line);color:var(--ink);padding:8px 6px;cursor:pointer;display:grid;gap:2px;font:inherit}
+.hist button:hover{border-color:var(--line-strong)}.hv{color:var(--muted);font-size:.85rem}
+@media (max-width:640px){.bitg{grid-template-columns:repeat(8,1fr)}.bitg button:nth-child(8n){margin-right:0}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<div class="cols wide-left">
+ <section class="panel">
+  <div class="row"><div class="seg" role="group" aria-label="Input base"><button type="button" data-b="16">HEX</button><button type="button" data-b="10">DEC</button><button type="button" data-b="8">OCT</button><button type="button" data-b="2">BIN</button></div>
+   <div class="seg" role="group" aria-label="Word size"><button type="button" data-w="8">8-bit</button><button type="button" data-w="16">16-bit</button><button type="button" data-w="32">32-bit</button><button type="button" data-w="64">64-bit</button></div>
+   <label class="chk"><input type="checkbox" id="sg"> Signed</label></div>
+  <label class="lbl mt" for="ex">Expression</label>
+  <input type="text" id="ex" spellcheck="false" autocomplete="off" style="font-size:1.25rem;padding:14px">
+  <p class="hint mt">Operators: + − * / % &amp; | ^ ~ &lt;&lt; &gt;&gt; &gt;&gt;&gt; and parentheses. Mix bases with 0x, 0b, 0o, or 0d prefixes. Press Enter to add to history.</p>
+  <div id="err" aria-live="polite"></div>
+  <table class="t res" id="res"><tbody></tbody></table>
+  <h2 class="sec">Bits <span class="hint">(click to flip)</span></h2><div class="bitg" id="bits"></div>
+ </section>
+ <section class="panel"><div class="panel-h"><h2>History</h2><button class="btn sm ghost" type="button" id="clr">Clear</button></div><ol class="hist" id="hist"></ol></section>
+</div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("dev-calculator");
+
+const $=DT.$,s=Object.assign({b:16,w:32,sg:false,ex:"0xFF00 | 0x0F",hist:[]},DT.get("devcalc",{}));let val=null;
+const DIG="0123456789abcdef";
+function lex(src){const T=[];let i=0;src=src.replace(/_/g,"");while(i<src.length){const c=src[i];if(/\s/.test(c)){i++;continue}
+ const three=src.slice(i,i+3),two=src.slice(i,i+2);if(three===">>>"){T.push(">>>");i+=3;continue}if(two==="<<"||two===">>"||two==="**"){T.push(two);i+=2;continue}
+ if("+-*/%&|^~()".includes(c)){T.push(c);i++;continue}
+ const m=src.slice(i).match(/^(0x[0-9a-f]+|0b[01]+|0o[0-7]+|0d\d+|[0-9a-f]+)/i);if(!m)throw`Unexpected “${c}”`;
+ let t=m[1].toLowerCase(),base=s.b;if(/^0x/.test(t)){base=16;t=t.slice(2)}else if(/^0b/.test(t)&&s.b!==16){base=2;t=t.slice(2)}else if(/^0o/.test(t)){base=8;t=t.slice(2)}else if(/^0d/.test(t)&&s.b!==16){base=10;t=t.slice(2)}
+ let v=0n;for(const ch of t){const d=DIG.indexOf(ch);if(d<0||d>=base)throw`“${m[1]}” isn't a valid base-${base} number`;v=v*BigInt(base)+BigInt(d)}T.push(v);i+=m[1].length}return T}
+const PREC={"|":1,"^":2,"&":3,"<<":4,">>":4,">>>":4,"+":5,"-":5,"*":6,"/":6,"%":6,"**":7};
+function evalT(T){let p=0;const W=BigInt(s.w),MASK=(1n<<W)-1n;
+ const wrap=v=>{v&=MASK;return s.sg&&v>>(W-1n)?v-(1n<<W):v};
+ function prim(){const t=T[p++];if(t===undefined)throw"The expression ends too early";if(typeof t==="bigint")return wrap(t);
+  if(t==="(" ){const v=expr(0);if(T[p++]!==")")throw"Missing )";return v}if(t==="-")return wrap(-prim());if(t==="+")return prim();if(t==="~")return wrap(~prim());throw`Unexpected “${t}”`}
+ function expr(min){let l=prim();while(p<T.length&&PREC[T[p]]>=min&&PREC[T[p]]){const op=T[p++],pr=PREC[op];const r=expr(op==="**"?pr:pr+1);l=apply(op,l,r)}return l}
+ function apply(op,a,b){const u=x=>x&MASK;switch(op){case"+":return wrap(a+b);case"-":return wrap(a-b);case"*":return wrap(a*b);case"/":if(!b)throw"Can't divide by zero";return wrap(a/b);case"%":if(!b)throw"Can't divide by zero";return wrap(a%b);
+  case"**":if(b<0n)throw"Negative powers aren't integers";return wrap(a**b);case"&":return wrap(a&b);case"|":return wrap(a|b);case"^":return wrap(a^b);case"<<":return wrap(a<<(b%W));case">>":return wrap(a>>(b%W));case">>>":return wrap(u(a)>>(b%W))}}
+ const v=expr(0);if(p<T.length)throw`Unexpected “${T[p]}”`;return v}
+function show(v,b){const W=BigInt(s.w);const u=v<0n?v+(1n<<W):v;return b===10?v.toString():u.toString(b).toUpperCase()}
+function group(str,n){return str.replace(new RegExp(`\\B(?=(.{${n}})+$)`,"g")," ")}
+function run(){DT.set("devcalc",s);DT.$$("[data-b]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.b===s.b));DT.$$("[data-w]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.w===s.w));
+ try{const T=lex(s.ex);if(!T.length){val=null;$("#err").innerHTML="";draw();return}val=evalT(T);$("#err").innerHTML=""}
+ catch(e){$("#err").innerHTML=`<p class="status bad mt">${DT.esc(String(e))}</p>`;return}draw()}
+function draw(){const rows=val===null?[]:[["HEX",group(show(val,16),4),16],["DEC",Number(val)>=1e4||Number(val)<=-1e4?BigInt(val).toLocaleString():show(val,10),10],["OCT",show(val,8),8],["BIN",group(show(val,2).padStart(s.w,"0"),4),2]];
+ $("#res tbody").innerHTML=rows.map(([k,v])=>`<tr><th scope="row">${k}</th><td class="code">${v}</td><td style="width:1%"><button class="btn sm" type="button" data-cp="${k}">Copy</button></td></tr>`).join("");
+ DT.$$("[data-cp]").forEach(b=>b.onclick=()=>DT.copy(b.closest("tr").querySelector("td").textContent.replace(/[\s,]/g,""),b));
+ const W=BigInt(s.w),u=val===null?0n:(val<0n?val+(1n<<W):val);
+ $("#bits").innerHTML=Array.from({length:s.w},(_,i)=>{const bit=s.w-1-i,on=(u>>BigInt(bit))&1n;return`<button type="button" class="${on?"on":""}" data-bit="${bit}" aria-label="Bit ${bit}, ${on?"on":"off"}"><span>${on}</span><small>${bit%4===0?bit:""}</small></button>`}).join("");
+ DT.$$("[data-bit]").forEach(b=>b.onclick=()=>{const n=u^(1n<<BigInt(b.dataset.bit));s.ex="0x"+n.toString(16).toUpperCase();$("#ex").value=s.b===16?n.toString(16).toUpperCase():s.ex;run()})}
+function hist(){$("#hist").innerHTML=s.hist.length?s.hist.map((h,i)=>`<li><button type="button" data-h="${i}"><span class="code">${DT.esc(h.e)}</span><span class="code hv">= ${DT.esc(h.r)}</span></button></li>`).join(""):'<li class="hint">Press Enter to save a result here.</li>';
+ DT.$$("[data-h]").forEach(b=>b.onclick=()=>{const h=s.hist[b.dataset.h];s.b=h.b;s.ex=h.e;$("#ex").value=h.e;run()})}
+$("#ex").value=s.ex;$("#ex").oninput=e=>{s.ex=e.target.value;run()};
+$("#ex").onkeydown=e=>{if(e.key==="Enter"&&val!==null){s.hist=[{e:s.ex,r:`${show(val,16)}h / ${show(val,10)}`,b:s.b},...s.hist].slice(0,30);hist();DT.set("devcalc",s)}};
+DT.$$("[data-b]").forEach(x=>x.onclick=()=>{const nb=+x.dataset.b;if(val!==null){s.ex=show(val,nb);$("#ex").value=s.ex}s.b=nb;run()});
+DT.$$("[data-w]").forEach(x=>x.onclick=()=>{s.w=+x.dataset.w;run()});
+$("#sg").checked=s.sg;$("#sg").onchange=e=>{s.sg=e.target.checked;run()};$("#clr").onclick=()=>{s.hist=[];hist();DT.set("devcalc",s)};
+hist();run();
+
+</script>
+</body>
+</html>

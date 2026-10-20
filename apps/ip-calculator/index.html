@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IP Address Calculator | Developer Tools</title>
+<meta name="description" content="Network, broadcast, and host range for any address">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.kv dd .cp{margin-left:6px;font-family:var(--ui);min-height:26px;padding:3px 8px;font-size:.78rem;vertical-align:middle}
+.sec{font:700 1rem/1.3 var(--ui);margin:22px 0 8px}
+.bin{font-size:.85rem}.nb{color:var(--accent)}.hb{color:var(--j-key)}
+#pfx{font-family:var(--mono);font-stretch:87.5%;font-weight:400}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <label class="lbl" for="in">IP address with prefix or mask</label>
+ <div class="row"><input type="text" id="in" spellcheck="false" autocomplete="off" style="flex:1;min-width:240px;font-size:1.2rem;padding:14px" placeholder="192.168.1.10/24, 10.0.0.5 255.255.252.0, or 2001:db8::1/64">
+  <select id="pfx" aria-label="Prefix"></select></div>
+ <div id="err" class="mt" aria-live="polite"></div>
+</section>
+<div class="cols" style="margin-top:28px" id="out"></div>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("ip-calculator");
+
+const IP={};
+IP.p4=s=>{const m=String(s).trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);if(!m)return null;const o=m.slice(1).map(Number);if(o.some(x=>x>255)||m.slice(1).some(x=>x.length>1&&x[0]==="0"))return null;return((o[0]<<24)>>>0)+(o[1]<<16)+(o[2]<<8)+o[3]};
+IP.s4=n=>[n>>>24,(n>>>16)&255,(n>>>8)&255,n&255].join(".");
+IP.mask=p=>p===0?0:(0xFFFFFFFF<<(32-p))>>>0;
+IP.pfx=m=>{let p=0;while(p<32&&(m>>>(31-p))&1)p++;return IP.mask(p)===m>>>0?p:null};
+IP.bin=n=>[24,16,8,0].map(k=>((n>>>k)&255).toString(2).padStart(8,"0")).join(".");
+IP.type4=n=>{const i=(a,b,p)=>(n&IP.mask(p))>>>0===(IP.p4(a)&IP.mask(p))>>>0;
+ if(i("10.0.0.0",0,8)||i("172.16.0.0",0,12)||i("192.168.0.0",0,16))return"Private (RFC 1918)";if(i("100.64.0.0",0,10))return"Carrier-grade NAT (RFC 6598)";if(i("127.0.0.0",0,8))return"Loopback";
+ if(i("169.254.0.0",0,16))return"Link-local (APIPA: no DHCP answer)";if(i("224.0.0.0",0,4))return"Multicast";if(i("240.0.0.0",0,4))return n===0xFFFFFFFF?"Broadcast":"Reserved";if(i("0.0.0.0",0,8))return"This network";
+ if(i("192.0.2.0",0,24)||i("198.51.100.0",0,24)||i("203.0.113.0",0,24))return"Documentation (TEST-NET)";if(i("198.18.0.0",0,15))return"Benchmarking";return"Public"};
+IP.class4=n=>{const a=n>>>24;return a<128?"A":a<192?"B":a<224?"C":a<240?"D (multicast)":"E (reserved)"};
+IP.p6=str=>{let s=String(str).trim().toLowerCase().replace(/^\[|\]$/g,"").replace(/%.*$/,"");let tail4=null;const m4=s.match(/(\d+\.\d+\.\d+\.\d+)$/);if(m4){const n=IP.p4(m4[1]);if(n===null)return null;s=s.slice(0,-m4[1].length)+((n>>>16).toString(16))+":"+((n&65535).toString(16))}
+ if(!/^[0-9a-f:]+$/.test(s)||(s.match(/::/g)||[]).length>1)return null;let parts;
+ if(s.includes("::")){const [a,b]=s.split("::");const A=a?a.split(":"):[],B=b?b.split(":"):[];if(A.length+B.length>7)return null;parts=[...A,...Array(8-A.length-B.length).fill("0"),...B]}else parts=s.split(":");
+ if(parts.length!==8||parts.some(x=>!/^[0-9a-f]{1,4}$/.test(x)))return null;return parts.reduce((v,x)=>(v<<16n)|BigInt(parseInt(x,16)),0n)};
+IP.full6=v=>Array.from({length:8},(_,i)=>((v>>BigInt(112-16*i))&0xFFFFn).toString(16).padStart(4,"0")).join(":");
+IP.s6=v=>{const g=IP.full6(v).split(":").map(x=>x.replace(/^0+(?=.)/,""));let bs=-1,bl=0;for(let i=0;i<8;){if(g[i]==="0"){let j=i;while(j<8&&g[j]==="0")j++;if(j-i>bl&&j-i>1){bs=i;bl=j-i}i=j}else i++}
+ if(bs<0)return g.join(":");return(g.slice(0,bs).join(":")+"::"+g.slice(bs+bl).join(":"))};
+IP.mask6=p=>p===0?0n:((1n<<128n)-1n)^((1n<<BigInt(128-p))-1n);
+IP.type6=v=>{const top=p=>v>>BigInt(128-p);if(v===0n)return"Unspecified";if(v===1n)return"Loopback";if(top(10)===0x3FAn)return"Link-local";if(top(7)===0x7En)return"Unique local (private)";if(top(8)===0xFFn)return"Multicast";
+ if(top(96)===0xFFFFn)return"IPv4-mapped";if(top(32)===0x20010db8n)return"Documentation";if(top(3)===1n)return"Global unicast (public)";return"Reserved"};
+IP.parse=str=>{str=String(str).trim();let [a,pf]=str.split("/");let p=pf===undefined?null:pf.trim();
+ const sp=a.trim().split(/\s+/);if(sp.length===2&&p===null){a=sp[0];p=sp[1]}
+ const v4=IP.p4(a);if(v4!==null){if(p===null||p==="")p=null;else if(/^\d+$/.test(p)){p=+p;if(p>32)throw"An IPv4 prefix goes from /0 to /32."}else{const m=IP.p4(p);if(m===null)throw"That subnet mask isn't valid.";const pp=IP.pfx(m);if(pp===null){const w=IP.pfx((~m)>>>0);throw"That mask has gaps in it. A valid mask is all 1s followed by all 0s, like 255.255.255.0."}p=pp}return{v:4,n:v4,p}}
+ const v6=IP.p6(a);if(v6!==null){if(p!==null&&p!==""){if(!/^\d+$/.test(p)||+p>128)throw"An IPv6 prefix goes from /0 to /128.";p=+p}else p=null;return{v:6,n:v6,p}}
+ throw"That isn't a valid IPv4 or IPv6 address."};
+
+const $=DT.$,s=Object.assign({in:"192.168.1.10/24"},DT.get("ipcalc",{}));
+$("#pfx").innerHTML='<option value="">Pick a prefix</option>'+Array.from({length:33},(_,p)=>`<option value="${p}">/${p}  ${IP.s4(IP.mask(p))}</option>`).join("");
+function row(k,v,cp){return`<dt>${k}</dt><dd>${v}${cp?` <button class="btn sm ghost cp" type="button" data-v="${DT.attr(cp)}">Copy</button>`:""}</dd>`}
+function run(){DT.set("ipcalc",s);const o=$("#out");$("#err").innerHTML="";let r;
+ if(!s.in.trim()){o.innerHTML="";return}
+ try{r=IP.parse(s.in)}catch(e){$("#err").innerHTML=`<p class="status bad">${DT.esc(String(e))}</p>`;o.innerHTML="";return}
+ if(r.v===4){const p=r.p===null?(r.n>>>24<128?8:r.n>>>24<192?16:24):r.p;$("#pfx").value=p;
+  const m=IP.mask(p),net=(r.n&m)>>>0,bc=(net|(~m>>>0))>>>0,size=2**(32-p);const hosts=p>=31?(p===31?2:1):size-2;
+  const first=p>=31?net:net+1,last=p>=31?bc:bc-1;const rev=IP.s4(net).split(".").slice(0,Math.max(1,Math.floor(p/8))).reverse().join(".")+".in-addr.arpa";
+  o.innerHTML=`<section class="panel"><div class="panel-h"><h2>Network</h2>${r.p===null?`<span class="hint">No prefix given, so assuming /${p} (classful)</span>`:""}</div><dl class="kv">
+   ${row("Address",IP.s4(r.n),IP.s4(r.n))}${row("Network",`${IP.s4(net)}/${p}`,`${IP.s4(net)}/${p}`)}${row("Subnet mask",IP.s4(m),IP.s4(m))}${row("Wildcard mask",IP.s4(~m>>>0),IP.s4(~m>>>0))}
+   ${row("Broadcast",p>=31?"None (point-to-point or single host)":IP.s4(bc),p>=31?"":IP.s4(bc))}${row("Usable hosts",`${IP.s4(first)} to ${IP.s4(last)}`)}${row("Host count",`${hosts.toLocaleString()} usable of ${size.toLocaleString()} addresses`)}</dl></section>
+   <section class="panel"><div class="panel-h"><h2>About this address</h2></div><dl class="kv">
+   ${row("Type",IP.type4(r.n))}${row("Class",IP.class4(r.n))}${row("Position",r.n===net&&p<31?"This is the network address. Don't assign it to a device.":r.n===bc&&p<31?"This is the broadcast address. Don't assign it to a device.":"A usable host address")}
+   ${row("Reverse DNS zone",rev,rev)}${row("Hex",r.n.toString(16).toUpperCase().padStart(8,"0"),"0x"+r.n.toString(16).toUpperCase().padStart(8,"0"))}${row("Integer",String(r.n))}</dl>${IP.type4(r.n)==="Public"?`<p class="mt"><a href="../ip-lookup/index.html?ip=${IP.s4(r.n)}">Look up who owns this address</a></p>`:""}
+   <h2 class="sec">In binary</h2><pre class="out bin" style="min-height:0">${bin(r.n,p,"Address")}\n${bin(m,p,"Mask   ")}\n${bin(net,p,"Network")}</pre></section>`}
+ else{const p=r.p===null?128:r.p;$("#pfx").value="";const m=IP.mask6(p),net=r.n&m,last=net|(((1n<<128n)-1n)^m),count=1n<<BigInt(128-p);
+  o.innerHTML=`<section class="panel"><div class="panel-h"><h2>Network</h2></div><dl class="kv">${row("Compressed",IP.s6(r.n),IP.s6(r.n))}${row("Expanded",IP.full6(r.n),IP.full6(r.n))}
+   ${row("Network",`${IP.s6(net)}/${p}`,`${IP.s6(net)}/${p}`)}${row("First address",IP.s6(net))}${row("Last address",IP.s6(last))}${row("Addresses",count<10n**15n?count.toLocaleString():`2^${128-p}`)}
+   ${p<=64&&p%4===0?row("/64 subnets inside",p===64?"1":`2^${64-p} (${(1n<<BigInt(64-p)).toLocaleString()})`):""}</dl></section>
+   <section class="panel"><div class="panel-h"><h2>About this address</h2></div><dl class="kv">${row("Type",IP.type6(r.n))}
+   ${row("Reverse DNS",IP.full6(r.n).replace(/:/g,"").split("").reverse().join(".")+".ip6.arpa")}</dl></section>`}
+ DT.$$(".cp",o).forEach(b=>b.onclick=()=>DT.copy(b.dataset.v,b))}
+function bin(n,p,l){const b=IP.bin(n);let k=0,out="";for(const c of b){if(c==="."){out+=".";continue}out+=k<p?`<span class="nb">${c}</span>`:`<span class="hb">${c}</span>`;k++}return`${l}  ${out}`}
+$("#in").value=s.in;$("#in").oninput=DT.debounce(e=>{s.in=$("#in").value;run()},150);
+$("#pfx").onchange=e=>{if(e.target.value==="")return;s.in=s.in.split(/[\/\s]/)[0]+"/"+e.target.value;$("#in").value=s.in;run()};
+run();
+
+</script>
+</body>
+</html>

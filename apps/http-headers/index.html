@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HTTP Header Reference | Developer Tools</title>
+<meta name="description" content="Request and response headers explained">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="icon" href="../../icon.svg">
+<link rel="manifest" href="../../manifest.webmanifest">
+<script>try{var t=localStorage.getItem("dt:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..800&display=swap">
+<link rel="stylesheet" href="../../shared/kit.css">
+<style>
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{appearance:none;border:1px solid var(--line);background:none;color:var(--ink);font:700 .88rem var(--ui);padding:7px 12px;border-radius:var(--r);cursor:pointer}
+.chip:hover{border-color:var(--line-strong)}.chip[aria-pressed=true]{background:var(--line-strong);color:var(--bg);border-color:var(--line-strong)}
+.rt td{line-height:1.5}.rt td.code{white-space:nowrap;font-weight:600;color:var(--accent)}
+.rt td.name{font-weight:700;min-width:140px}.rt td.dim{color:var(--muted);font-size:.9rem;min-width:200px}
+.rt td.ex{font-family:var(--mono);font-stretch:87.5%;font-size:.82rem;color:var(--muted);word-break:break-all;min-width:200px}
+.tg{display:inline-block;border:1px solid var(--line);border-radius:var(--r);padding:1px 7px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+kbd{display:inline-block;font:600 .8rem/1 var(--mono);font-stretch:87.5%;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:3px;padding:4px 6px;background:var(--inset);white-space:nowrap}
+.plus{color:var(--muted);margin:0 2px;font-size:.8rem}
+.rt td.keys{white-space:nowrap}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="panel">
+ <div class="row"><label class="sr" for="q">Search</label><input type="search" id="q" placeholder="Search headers, like cache or cookie" autocomplete="off" style="flex:1;min-width:220px;font-family:var(--ui);font-size:1.05rem"><span class="hint" id="cnt"></span></div>
+ <div class="chips mt" id="chips" role="group" aria-label="Filter"></div>
+</section>
+<section class="panel" style="margin-top:28px"><div style="overflow-x:auto"><table class="t rt" id="tbl"><thead></thead><tbody></tbody></table></div>
+ <p class="hint mt" id="empty" hidden>Nothing matches that search.</p><p class="hint mt">Header names aren't case-sensitive. Check a site's headers in the browser's developer tools, Network tab.</p></section>
+</main>
+<script src="../../shared/tools.js"></script>
+<script src="../../shared/kit.js"></script>
+<script>
+DT.mount("http-headers");
+
+const $=DT.$;const COLS=[{"h": "Header", "i": 1, "cls": "name"}, {"h": "Used in", "i": 0, "cls": "tag"}, {"h": "What it does", "i": 2}, {"h": "Example", "i": 3, "cls": "ex"}, {"h": "Group", "i": 0, "cls": "tag", "grp": 1}],ROWS=[["Request", "Accept", "Which content types the client can handle.", "Accept: application/json"], ["Request", "Accept-Encoding", "Which compression the client supports.", "Accept-Encoding: gzip, br"], ["Request", "Accept-Language", "The visitor's preferred languages.", "Accept-Language: en-US,en;q=0.9"], ["Request", "Authorization", "Credentials, such as a bearer token or Basic sign-in.", "Authorization: Bearer eyJhbGciOi…"], ["Request", "Cookie", "Cookies the browser sends back to the site.", "Cookie: session=abc123"], ["Request", "Host", "The domain being requested. Lets one server host many sites.", "Host: davis-tech-support.com"], ["Request", "If-Modified-Since", "Only send the file if it changed after this date.", "If-Modified-Since: Wed, 30 Sep 2026 12:00:00 GMT"], ["Request", "If-None-Match", "Only send the file if its ETag changed.", "If-None-Match: \"33a64df5\""], ["Request", "Origin", "The site that started the request. Used for CORS checks.", "Origin: https://app.example.com"], ["Request", "Range", "Ask for part of a file, for resuming downloads.", "Range: bytes=0-1023"], ["Request", "Referer", "The page the visitor came from. (The misspelling is official.)", "Referer: https://www.google.com/"], ["Request", "User-Agent", "Identifies the browser or app and operating system.", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)…"], ["Request", "X-Forwarded-For", "The original visitor IP when traffic passes through a proxy.", "X-Forwarded-For: 203.0.113.7, 10.0.0.2"], ["Request", "X-Forwarded-Proto", "Whether the visitor used http or https before the proxy.", "X-Forwarded-Proto: https"], ["Request", "Sec-Fetch-Site", "Browser-set: whether the request is same-site or cross-site.", "Sec-Fetch-Site: same-origin"], ["Request", "Upgrade-Insecure-Requests", "The browser prefers an HTTPS version if there is one.", "Upgrade-Insecure-Requests: 1"], ["Response", "Cache-Control", "How long browsers and CDNs may cache the response.", "Cache-Control: public, max-age=31536000, immutable"], ["Response", "Content-Disposition", "Show in the browser, or download with a file name.", "Content-Disposition: attachment; filename=\"report.pdf\""], ["Response", "Content-Encoding", "The compression used on the body.", "Content-Encoding: br"], ["Response", "Content-Length", "Size of the body in bytes.", "Content-Length: 3495"], ["Response", "Content-Type", "The type of content, plus character set.", "Content-Type: text/html; charset=utf-8"], ["Response", "ETag", "A version tag for the file, used to check if it changed.", "ETag: \"33a64df5\""], ["Response", "Expires", "Older way to say when a cached copy goes stale.", "Expires: Thu, 01 Oct 2026 07:28:00 GMT"], ["Response", "Last-Modified", "When the file last changed.", "Last-Modified: Tue, 29 Sep 2026 18:00:00 GMT"], ["Response", "Location", "Where to go for a redirect or a newly created item.", "Location: https://example.com/new-page"], ["Response", "Retry-After", "How long to wait before trying again, with 429 or 503.", "Retry-After: 120"], ["Response", "Server", "The server software. Often hidden for security.", "Server: nginx"], ["Response", "Set-Cookie", "Stores a cookie. Secure, HttpOnly, and SameSite matter.", "Set-Cookie: id=a3f; Secure; HttpOnly; SameSite=Lax"], ["Response", "Vary", "Which request headers change the response, so caches keep separate copies.", "Vary: Accept-Encoding"], ["Response", "WWW-Authenticate", "Tells the client how to sign in after a 401.", "WWW-Authenticate: Basic realm=\"Admin\""], ["Response", "Age", "Seconds the response has been sitting in a cache.", "Age: 24"], ["Security", "Strict-Transport-Security", "Forces HTTPS for this site from now on (HSTS).", "Strict-Transport-Security: max-age=31536000; includeSubDomains"], ["Security", "Content-Security-Policy", "Limits where scripts, styles, images, and frames can load from. Blocks most XSS.", "Content-Security-Policy: default-src 'self'; img-src 'self' data:"], ["Security", "X-Content-Type-Options", "Stops browsers from guessing content types.", "X-Content-Type-Options: nosniff"], ["Security", "X-Frame-Options", "Blocks other sites from showing yours in a frame (clickjacking). CSP frame-ancestors is the newer way.", "X-Frame-Options: DENY"], ["Security", "Referrer-Policy", "How much of the address to share when visitors click away.", "Referrer-Policy: strict-origin-when-cross-origin"], ["Security", "Permissions-Policy", "Turns off browser features like the camera or location.", "Permissions-Policy: camera=(), microphone=(), geolocation=()"], ["Security", "Cross-Origin-Opener-Policy", "Isolates your page from pop-ups it opens.", "Cross-Origin-Opener-Policy: same-origin"], ["Security", "Cross-Origin-Resource-Policy", "Controls which sites may load this file.", "Cross-Origin-Resource-Policy: same-site"], ["CORS", "Access-Control-Allow-Origin", "Which other sites may read this response.", "Access-Control-Allow-Origin: https://app.example.com"], ["CORS", "Access-Control-Allow-Methods", "Methods allowed for cross-site requests.", "Access-Control-Allow-Methods: GET, POST, OPTIONS"], ["CORS", "Access-Control-Allow-Headers", "Request headers allowed for cross-site requests.", "Access-Control-Allow-Headers: Content-Type, Authorization"], ["CORS", "Access-Control-Allow-Credentials", "Whether cookies can be sent with cross-site requests.", "Access-Control-Allow-Credentials: true"], ["CORS", "Access-Control-Max-Age", "How long the browser can cache the CORS preflight answer.", "Access-Control-Max-Age: 86400"], ["CORS", "Access-Control-Expose-Headers", "Response headers that scripts on other sites may read.", "Access-Control-Expose-Headers: X-Request-Id"], ["Both", "Connection", "Keep the connection open or close it.", "Connection: keep-alive"], ["Both", "Date", "When the message was sent.", "Date: Wed, 30 Sep 2026 14:00:00 GMT"], ["Both", "Upgrade", "Asks to switch protocol, like to WebSocket.", "Upgrade: websocket"], ["Both", "Via", "Proxies the message passed through.", "Via: 1.1 varnish"]],CAT=0;const DEF="";
+const cats=[...new Set(ROWS.map(r=>r[CAT]))];const key="ref.http-headers";let cur=DT.get(key,DEF||"");if(cur&&!cats.includes(cur))cur="";
+$("#chips").innerHTML=(DEF?"":`<button type="button" class="chip" data-c="">All</button>`)+cats.map(c=>`<button type="button" class="chip" data-c="${DT.attr(c)}">${DT.esc(c)}</button>`).join("");
+const kbd=v=>v.split(/\s+or\s+/).map(alt=>alt.split(/(?<=\S)\+(?=\S)/).map(k=>`<kbd>${DT.esc(k)}</kbd>`).join('<span class="plus">+</span>')).join(' <span class="hint">or</span> ');
+function render(){DT.set(key,cur);const words=$("#q").value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+ DT.$$(".chip").forEach(b=>b.setAttribute("aria-pressed",!words.length&&b.dataset.c===cur));
+ const vis=ROWS.filter(r=>(!cur||r[CAT]===cur||words.length)&&words.every(w=>r.join(" ").toLowerCase().includes(w)));
+ const multi=new Set(vis.map(r=>r[CAT])).size>1;const show=COLS.filter(c=>vis.some(r=>r[c.i])&&(!c.grp||multi));
+ $("#tbl thead").innerHTML=`<tr>${show.map(c=>`<th scope="col">${c.h2&&show.some(x=>x.i===c.pair)?c.h2:c.h}</th>`).join("")}</tr>`;
+ $("#tbl tbody").innerHTML=vis.map(r=>`<tr>${show.map(c=>`<td class="${c.cls||""}">${!r[c.i]?"":c.cls==="keys"?kbd(r[c.i]):c.cls==="tag"?`<span class="tg">${DT.esc(r[c.i])}</span>`:DT.esc(r[c.i])}</td>`).join("")}</tr>`).join("");
+ $("#cnt").textContent=`${vis.length} of ${ROWS.length}`;$("#empty").hidden=vis.length>0}
+DT.$$(".chip").forEach(b=>b.onclick=()=>{cur=b.dataset.c;render()});$("#q").addEventListener("input",DT.debounce(render,80));
+document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"){e.preventDefault();$("#q").focus()}});
+render();
+
+</script>
+</body>
+</html>
